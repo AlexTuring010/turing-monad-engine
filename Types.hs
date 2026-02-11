@@ -1,3 +1,5 @@
+module Types where
+
 data Tape = Tape [Char] [Char]
 -- Example: Tape ['b', 'a'] ['c', 'd'] 
 -- represents a tape like ... a b [c] d ...

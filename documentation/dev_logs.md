@@ -74,3 +74,47 @@ instance Ord Direction where
     MoveRight <= MoveLeft  = False
 
 Though I dont think we will need to do such comparisons in the project
+
+I will go to Types.hs now and start defining types for our Tape, the Direction, Action, Map, the Machine and the Program
+
+About Maybe and Either now, which you recommend we use. Maybe and Either can be thought as "protective boxes" for our data. In languages like C or Java, a function might return a value or it might return null. But null is dangerous- if you forget to check for it, the program crashes.
+
+In haskell, null does no exist, we must use these "wrapper" types instead.
+
+The maybe type:
+
+Concept: Use this when a function might fail to find something but you don't necessarily need a detailed explanation of why
+
+data Maybe a = Nothing | Just a
+
+Nothing: Represents a failure or "not found."
+Just a: Represens success, where a is the actual value you wanted
+
+In my Map.hs, the find function returns Maybe v. If the machine state exists, I get Just State. If the user asked for a state that isn't in the tree, I get Nothing.
+
+The Either Type: Use this when a function can fail, and you want to provide a reason or error message
+
+data Either a b = Left a | Right b
+
+Left a: Usually holds the Error Message (by convention)
+Right b: Hold the Correct Result (Mnemonic: "Right is Right").
+
+In my Parser.hs later I will return Either String Program. If the code is perfect, I return Right Program, if the user forgot a semicolon, I return Left "Missing semicolon on line 5".
+
+To finish with day 2 I have to test that the Map works
+
+1. The "Zeror Errors" Test
+
+Does the code compile?
+ghci Maps.hs | It does compile!
+
+Now playing around a bit:
+
+ghci> let myMap = insert "start" 5 Empty
+ghci> let myMap2 = insert "print_hi" 3 myMap
+ghci> myMap2
+((Empty <- ["print_hi": 3] -> Empty) <- ["start": 5] -> Empty)
+ghci> find "start" myMap2
+Just 5
+ghci> find "clear_tape" myMap2
+Nothing
