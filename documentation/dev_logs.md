@@ -118,3 +118,9 @@ ghci> find "start" myMap2
 Just 5
 ghci> find "clear_tape" myMap2
 Nothing
+
+It places "print_hi" to the left of "start" because p comes before s. Just like we intended!
+
+An issue I realise looking at it is that it is not a Balanced Binary Search Tree, I mean, items can keep being added to the left leading to a time complexity of O(n), I DO NOT LIKE THAT!
+
+So, I searched for a way to implement an AVL Tree implementation in haskell

@@ -28,14 +28,14 @@ instance Show Action where
     show (Move d) = "Move " ++ show d
     show (Call s) = "Call " ++ s
 
--- Our map data structure will be a binary search tree so we can
+-- Our map data structure will be an AVL tree so we can
 -- have time complexity of O(log n) for lookups and insertions.
-data MyMap k v = Empty | Node k v (MyMap k v) (MyMap k v)
+data MyMap k v = Empty | Node Int k v (MyMap k v) (MyMap k v)
 
 -- We can only 'show' a Map if we know how to 'show' the keys and values.
 instance (Show k, Show v) => Show (MyMap k v) where
     show Empty = "Empty"
-    show (Node k v left right) =
+    show (Node _ k v left right) =
         "(" ++ show  left ++ " <- [" ++ show k ++ ": " ++ show v ++ "] -> " ++ show right ++ ")"
 
 data Machine = Machine {

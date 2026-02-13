@@ -1,57 +1,57 @@
-module Map where
-import Types
+module Parser where
 
--- 1. We update the Node to store its height (an Int)
--- This helps us check if it's "heavy" on one side.
--- data MyMap k v = Empty | Node Int k v (MyMap k v) (MyMap k v)
+import Types     -- This gives us access to our data types like Machine, Action, etc.
+import Map       -- This gives us the AVL tree implementation for our machine's state
+import Tokenizer -- Give us access to the tokenizer and the isContained function
 
--- Helper: Get height safely
-getHeight :: MyMap k v -> Int
-getHeight Empty = 0
-getHeight (Node h _ _ _ _) = h
+-- Project specifications recommend that we use Either for error messages
+type ParseResult a = Either String a
 
--- Helper: Calculate balance factor
-balanceFactor :: MyMap k v -> Int
-balanceFactor Empty = 0
-balanceFactor (Node _ _ _ l r) = getHeight l - getHeight r
+-- | This is a helper function to make it easier to work with Either in our parser.
+-- It allows us to chain parsing steps together without deeply nested case statements.
+either :: (a -> c) -> (b -> c) -> Either a b -> c
+either f _ (Left x) = f x
+either _ g (Right y) = g y
 
--- 2. The Rotation Functions (The "Surgery")
--- These just rearrange the Nodes to keep them level.
-rotateRight :: MyMap k v -> MyMap k v
-rotateRight (Node _ k v (Node _ lk lv ll lr) r) = 
-    let newR = mkNode k v lr r
-    in mkNode lk lv ll newR
-rotateRight t = t
+-- | Extracts the alphabet list from the start of the program.
+-- Grammar: alphabet = { character_list } 
+parseAlphabet :: [String] -> ParseResult ([String], [String])
+parseAlphabet ("alphabet":rest) = 
+    let symbols = takeWhile (/= "machine") rest
+        remaining = dropWhile (/= "machine") rest
+    in if null symbols 
+       then Left "Error: Alphabet cannot be empty"
+       else Right (symbols, remaining)
+parseAlphabet _ = Left "Error: Program must start with 'alphabet = { ... }'"
 
-rotateLeft :: MyMap k v -> MyMap k v
-rotateLeft (Node _ k v l (Node _ rk rv rl rr)) = 
-    let newL = mkNode k v l rl
-    in mkNode rk rv newL rr
-rotateLeft t = t
+-- | Checks if a character is valid according to the defined alphabet.
+-- This fulfills the requirement to check if written chars belong to the alphabet.
+validateChar :: String -> [String] -> ParseResult String
+validateChar c alphabet =
+    if isContained c alphabet || c == "_"  -- "_" is the blank symbol 
+    then Right c
+    else Left ("Error: Character '" ++ c ++ "' is not in the defined alphabet.")
 
--- 3. The Smart Constructor (Calculates height)
-mkNode :: k -> v -> MyMap k v -> MyMap k v -> MyMap k v
-mkNode k v l r = Node (1 + max (getHeight l) (getHeight r)) k v l r
+-- | The main entry point for the Parser (to be expanded Day 4-6).
+-- Currently only handles the very first part of the grammar.
+parseProgram :: String -> ParseResult [String]
+parseProgram input =
+    either
+        Left
+        (\tokens ->
+            either
+                Left
+                (\(alphabet, _) ->
+                    -- For today, we just return the alphabet to prove it works.
+                    -- Tomorrow, we will pass the remaining tokens to the machine parser.
+                    Right alphabet
+                )
+                (parseAlphabet tokens)
+        )
+        (tokenize input)
 
--- 4. The Balanced Insert
-insert :: (Ord k) => k -> v -> MyMap k v -> MyMap k v
-insert newK newV Empty = Node 1 newK newV Empty Empty
-insert newK newV (Node h k v l r)
-    | newK < k  = rebalance (mkNode k v (insert newK newV l) r)
-    | newK > k  = rebalance (mkNode k v l (insert newK newV r))
-    | otherwise = Node h k v l r -- Key exists, do nothing
-
--- 5. The Rebalance Logic
--- This checks the 4 cases (Left-Left, Left-Right, etc.)
-rebalance :: MyMap k v -> MyMap k v
-rebalance t
-    | balanceFactor t > 1 && balanceFactor (leftBranch t) >= 0 = rotateRight t
-    | balanceFactor t > 1 = rotateRight (mkNode (key t) (val t) (rotateLeft (leftBranch t)) (rightBranch t))
-    | balanceFactor t < -1 && balanceFactor (rightBranch t) <= 0 = rotateLeft t
-    | balanceFactor t < -1 = rotateLeft (mkNode (key t) (val t) (leftBranch t) (rotateRight (rightBranch t)))
-    | otherwise = t
-  where 
-    leftBranch (Node _ _ _ l _) = l
-    rightBranch (Node _ _ _ _ r) = r
-    key (Node _ k _ _ _) = k
-    val (Node _ _ v _ _) = v
+-- | A small test helper for GHCi
+testParser :: String -> IO ()
+testParser input = case parseProgram input of
+    Left err -> putStrLn ("Failed: " ++ err)
+    Right res -> putStrLn ("Success! Alphabet found: " ++ show res)
