@@ -20,37 +20,31 @@ either _ g (Right y) = g y
 -- Grammar: alphabet = { character_list } 
 parseAlphabet :: [String] -> ParseResult (AlphabetMap, [String])
 parseAlphabet ("alphabet":"=":"{":rest) =
-    either
-        Left
-        (\(symbols, remaining) ->
-            if null symbols
-            then Left "Error: Alphabet cannot be empty"
-            else
-                either
-                    Left
-                    (\alphabetMap -> Right (alphabetMap, remaining))
-                    (buildAlphabetMap symbols)
-        )
-        (parseSymbolList rest)
+    parseSymbolMap rest
 parseAlphabet _ = Left "Error: Expected 'alphabet = { ... }'"
 
 -- | Parses a comma-separated list of symbols ending with '}'.
--- Returns the symbols and the remaining tokens after the closing brace.
-parseSymbolList :: [String] -> ParseResult ([String], [String])
-parseSymbolList ("}":rest) = Right ([], rest)
-parseSymbolList (sym:"}":rest) =
-    if isNameToken sym
-    then Right ([sym], rest)
-    else Left ("Error: Invalid alphabet symbol '" ++ sym ++ "' (must be alphanumeric)")
-parseSymbolList (sym:",":rest) =
-    if isNameToken sym
-    then
-        either
-            Left
-            (\(more, remaining) -> Right (sym : more, remaining))
-            (parseSymbolList rest)
-    else Left ("Error: Invalid alphabet symbol '" ++ sym ++ "' (must be alphanumeric)")
-parseSymbolList _ = Left "Error: Invalid alphabet list (expected symbols separated by commas, ending with '}')"
+-- Returns the alphabet map and the remaining tokens after the closing brace.
+parseSymbolMap :: [String] -> ParseResult (AlphabetMap, [String])
+parseSymbolMap ("}":_) = Left "Error: Alphabet cannot be empty"
+parseSymbolMap (sym:rest) =
+    either
+        Left
+        (\alphabetMap -> parseSymbolMapTail alphabetMap rest)
+        (insertSymbol Empty sym)
+parseSymbolMap _ = Left "Error: Invalid alphabet list (expected symbols separated by commas, ending with '}')"
+
+parseSymbolMapTail :: AlphabetMap -> [String] -> ParseResult (AlphabetMap, [String])
+parseSymbolMapTail alphabetMap ("}":rest) = Right (alphabetMap, rest)
+parseSymbolMapTail alphabetMap (",":rest) =
+    case rest of
+        (sym:more) ->
+            either
+                Left
+                (\updatedMap -> parseSymbolMapTail updatedMap more)
+                (insertSymbol alphabetMap sym)
+        _ -> Left "Error: Invalid alphabet list (expected symbols separated by commas, ending with '}')"
+parseSymbolMapTail _ _ = Left "Error: Invalid alphabet list (expected symbols separated by commas, ending with '}')"
 
 -- | Checks if a symbol is valid according to the defined alphabet.
 -- This fulfills the requirement to check if written symbols belong to the alphabet.
@@ -62,18 +56,13 @@ isInAlphabet sym alphabetMap
             Just _ -> Right sym
             Nothing -> Left ("Error: Symbol '" ++ sym ++ "' is not in the defined alphabet.")
 
-buildAlphabetMap :: [String] -> ParseResult AlphabetMap
-buildAlphabetMap = foldl insertUnique (Right Empty)
-    where
-        insertUnique acc sym =
-                either
-                        Left
-                        (\mapAcc ->
-                                case MyMap.lookup sym mapAcc of
-                                        Just _ -> Left ("Error: Duplicate alphabet symbol '" ++ sym ++ "'")
-                                        Nothing -> Right (MyMap.insert sym () mapAcc)
-                        )
-                        acc
+insertSymbol :: AlphabetMap -> String -> ParseResult AlphabetMap
+insertSymbol alphabetMap sym
+    | not (isNameToken sym) = Left ("Error: Invalid alphabet symbol '" ++ sym ++ "' (must be alphanumeric)")
+    | otherwise =
+        case MyMap.lookup sym alphabetMap of
+            Just _ -> Left ("Error: Duplicate alphabet symbol '" ++ sym ++ "'")
+            Nothing -> Right (MyMap.insert sym () alphabetMap)
 
 isNameToken :: String -> Bool
 isNameToken [] = False
