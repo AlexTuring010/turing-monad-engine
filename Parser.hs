@@ -51,20 +51,16 @@ parseAlphabet _ = Left "Error: Expected 'alphabet = { ... }'"
 -- Returns the alphabet map and the remaining tokens after the closing brace.
 parseSymbolMap :: [String] -> ParseResult (AlphabetMap, [String])
 parseSymbolMap ("}":_) = Left "Error: Alphabet cannot be empty"
-parseSymbolMap (sym:rest) =
-    either
-        Left
-        (\alphabetMap -> parseSymbolMapTail alphabetMap rest)
-        (insertSymbol Empty sym)
+parseSymbolMap (sym:rest) = do
+    alphabetMap <- insertSymbol Empty sym
+    parseSymbolMapTail alphabetMap rest
 parseSymbolMap _ = Left "Error: Invalid alphabet list (expected symbols separated by commas, ending with '}')"
 
 parseSymbolMapTail :: AlphabetMap -> [String] -> ParseResult (AlphabetMap, [String])
 parseSymbolMapTail alphabetMap ("}":rest) = Right (alphabetMap, rest)
-parseSymbolMapTail alphabetMap (",":sym:more) =
-    either
-        Left
-        (\updatedMap -> parseSymbolMapTail updatedMap more)
-        (insertSymbol alphabetMap sym)
+parseSymbolMapTail alphabetMap (",":sym:more) = do
+    updatedMap <- insertSymbol alphabetMap sym
+    parseSymbolMapTail updatedMap more
 parseSymbolMapTail _ (",":_) = Left "Error: Invalid alphabet list (expected symbols separated by commas, ending with '}')"
 parseSymbolMapTail _ _ = Left "Error: Invalid alphabet list (expected symbols separated by commas, ending with '}')"
 
@@ -96,11 +92,9 @@ parseSymbolChar :: AlphabetMap -> String -> ParseResult Char
 parseSymbolChar alphabetMap sym
     | sym == "_" = Right '_'
     | length sym /= 1 = Left ("Error: Symbol '" ++ sym ++ "' must be a single character")
-    | otherwise =
-        either
-            Left
-            (\_ -> Right (head sym))
-            (isInAlphabet sym alphabetMap)
+    | otherwise = do
+        _ <- isInAlphabet sym alphabetMap
+        Right (head sym)
 
 listContains :: Eq a => a -> [a] -> Bool
 listContains _ [] = False
@@ -128,10 +122,9 @@ validateStatesExist label states names = go names []
   where
     go [] acc = Right (reverse acc)
     go (name:rest) acc =
-        either
-            Left
-            (\validated -> go rest (validated:acc))
-            (validateStateInList label states name)
+                do
+                        validated <- validateStateInList label states name
+                        go rest (validated:acc)
 
 
 {-------------------------------------------------------------------------------------
@@ -143,35 +136,21 @@ validateStatesExist label states names = go names []
 -- | The main entry point for the Parser (to be expanded Day 4-6).
 -- Currently only handles the very first part of the grammar.
 parseProgram :: String -> ParseResult Program
-parseProgram input =
-    either
-        Left
-        (\tokens ->
-            either
-                Left
-                (\(alphabetMap, restTokens) ->
-                    either
-                        Left
-                        (\(machines, leftoverTokens) ->
-                            if leftoverTokens == []
-                                then
-                                    maybe
-                                        (Left "Error: Missing required machine named 'start'")
-                                        (\_ ->
-                                            Right Program
-                                                { globalAlphabet = alphabetMap
-                                                , allMachines = machines
-                                                , startMachine = "start"
-                                                }
-                                        )
-                                        (MyMap.lookup "start" machines)
-                                else Left "Error: Unexpected tokens after last machine"
-                        )
-                        (parseMachineList alphabetMap restTokens)
-                )
-                (parseAlphabet tokens)
-        )
-        (tokenize input)
+parseProgram input = do
+    tokens <- tokenize input
+    (alphabetMap, restTokens) <- parseAlphabet tokens
+    (machines, leftoverTokens) <- parseMachineList alphabetMap restTokens
+    case leftoverTokens of
+        [] ->
+            case MyMap.lookup "start" machines of
+                Just _ ->
+                    Right Program
+                        { globalAlphabet = alphabetMap
+                        , allMachines = machines
+                        , startMachine = "start"
+                        }
+                Nothing -> Left "Error: Missing required machine named 'start'"
+        _ -> Left "Error: Unexpected tokens after last machine"
 
 {-------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------
@@ -180,53 +159,29 @@ parseProgram input =
 --------------------------------------------------------------------------------------}
 
 parseMachineList :: AlphabetMap -> [String] -> ParseResult (MyMap String Machine, [String])
-parseMachineList alphabetMap ("machine":_) =
-    either
-        Left
-        (\(name, machine, rest) ->
-            parseMachineListTail alphabetMap (MyMap.insert name machine Empty) rest
-        )
-        (parseMachine alphabetMap)
+parseMachineList alphabetMap ("machine":_) = do
+    (name, machine, rest) <- parseMachine alphabetMap
+    parseMachineListTail alphabetMap (MyMap.insert name machine Empty) rest
 parseMachineList _ _ = Left "Error: Expected at least one machine definition"
 
 parseMachineListTail :: AlphabetMap -> MyMap String Machine -> [String] -> ParseResult (MyMap String Machine, [String])
-parseMachineListTail alphabetMap machines ("machine":_) =
-    either
-        Left
-        (\(name, machine, rest) ->
-            maybe
-                (parseMachineListTail alphabetMap (MyMap.insert name machine machines) rest)
-                (\_ -> Left ("Error: Duplicate machine name '" ++ name ++ "'"))
-                (MyMap.lookup name machines)
-        )
-        (parseMachine alphabetMap)
+parseMachineListTail alphabetMap machines ("machine":_) = do
+    (name, machine, rest) <- parseMachine alphabetMap
+    maybe
+        (parseMachineListTail alphabetMap (MyMap.insert name machine machines) rest)
+        (\_ -> Left ("Error: Duplicate machine name '" ++ name ++ "'"))
+        (MyMap.lookup name machines)
 parseMachineListTail _ machines tokens = Right (machines, tokens)
 
 parseMachine :: AlphabetMap -> [String] -> ParseResult (String, Machine, [String])
 parseMachine alphabetMap ("machine":name:"=":"{":rest)
     | not (isNameToken name) = Left ("Error: Invalid machine name '" ++ name ++ "'")
-    | otherwise =
-        either
-            Left
-            (\(states, restAfterStates) ->
-                either
-                    Left
-                    (\(initState, restAfterInit) ->
-                        either
-                            Left
-                            (\(haltingStates, restAfterHalting) ->
-                                either
-                                    Left
-                                    (\(transitions, restAfterFunction) ->
-                                        parseMachineEnd name states initState haltingStates transitions restAfterFunction
-                                    )
-                                    (parseFunctionSection alphabetMap states restAfterHalting)
-                            )
-                            (parseHaltingStatesSection states restAfterInit)
-                    )
-                    (parseInitStateSection states restAfterStates)
-            )
-            (parseStatesSection rest)
+    | otherwise = do
+        (states, restAfterStates) <- parseStatesSection rest
+        (initState, restAfterInit) <- parseInitStateSection states restAfterStates
+        (haltingStates, restAfterHalting) <- parseHaltingStatesSection states restAfterInit
+        (transitions, restAfterFunction) <- parseFunctionSection alphabetMap states restAfterHalting
+        parseMachineEnd name states initState haltingStates transitions restAfterFunction
 parseMachine _ _ = Left "Error: Expected 'machine <name> = { ... }'"
 
 parseMachineEnd :: String -> [String] -> String -> [String] -> MyMap (String, Char) (String, Action) -> [String] -> ParseResult (String, Machine, [String])
@@ -245,39 +200,27 @@ parseMachineEnd _ _ _ _ _ _ = Left "Error: Expected '}' to close machine definit
 
 parseStatesSection :: [String] -> ParseResult ([String], [String])
 parseStatesSection ("states":"=":"{":rest) =
-    either
-        Left
-        (\(states, restAfterStates) ->
-            either
-                Left
-                (\uniqueStates -> Right (uniqueStates, restAfterStates))
-                (ensureUniqueNames "state" states)
-        )
-        (parseStateList rest)
+    do
+        (states, restAfterStates) <- parseStateList rest
+        uniqueStates <- ensureUniqueNames "state" states
+        Right (uniqueStates, restAfterStates)
 parseStatesSection _ = Left "Error: Expected 'states = { ... }'"
 
 parseInitStateSection :: [String] -> [String] -> ParseResult (String, [String])
 parseInitStateSection states ("init_state":"=":"{":name:"}":rest) =
     if isNameToken name
-        then
-            either
-                Left
-                (\validated -> Right (validated, rest))
-                (validateStateInList "initial" states name)
+        then do
+            validated <- validateStateInList "initial" states name
+            Right (validated, rest)
         else Left ("Error: Invalid init state name '" ++ name ++ "'")
 parseInitStateSection _ _ = Left "Error: Expected 'init_state = { <state> }'"
 
 parseHaltingStatesSection :: [String] -> [String] -> ParseResult ([String], [String])
 parseHaltingStatesSection states ("halting_states":"=":"{":rest) =
-    either
-        Left
-        (\(haltStates, restAfterHalting) ->
-            either
-                Left
-                (\validated -> Right (validated, restAfterHalting))
-                (validateStatesExist "halting" states haltStates)
-        )
-        (parseHaltingStateList rest)
+    do
+        (haltStates, restAfterHalting) <- parseHaltingStateList rest
+        validated <- validateStatesExist "halting" states haltStates
+        Right (validated, restAfterHalting)
 parseHaltingStatesSection _ _ = Left "Error: Expected 'halting_states = { ... }'"
 
 parseStateList :: [String] -> ParseResult ([String], [String])
@@ -304,16 +247,10 @@ parseFunctionSection alphabetMap states ("function":"=":"{":rest) =
 parseFunctionSection _ _ _ = Left "Error: Expected 'function = { ... }'"
 
 parseFunctionEntries :: AlphabetMap -> [String] -> [String] -> ParseResult (MyMap (String, Char) (String, Action), [String])
-parseFunctionEntries alphabetMap states tokens =
-    either
-        Left
-        (\(key, value, rest) ->
-            either
-                Left
-                (\updated -> parseFunctionEntriesTail alphabetMap states updated rest)
-                (insertTransition Empty key value)
-        )
-        (parseFunctionEntry alphabetMap states tokens)
+parseFunctionEntries alphabetMap states tokens = do
+    (key, value, rest) <- parseFunctionEntry alphabetMap states tokens
+    updated <- insertTransition Empty key value
+    parseFunctionEntriesTail alphabetMap states updated rest
 
 parseFunctionEntriesTail :: AlphabetMap -> [String] -> MyMap (String, Char) (String, Action) -> [String] -> ParseResult (MyMap (String, Char) (String, Action), [String])
 parseFunctionEntriesTail alphabetMap states transitions (";":rest) =
@@ -322,54 +259,32 @@ parseFunctionEntriesTail _ _ _ _ = Left "Error: Expected ';' after function entr
 
 parseFunctionEntriesAfterSemicolon :: AlphabetMap -> [String] -> MyMap (String, Char) (String, Action) -> [String] -> ParseResult (MyMap (String, Char) (String, Action), [String])
 parseFunctionEntriesAfterSemicolon _ _ transitions ("}":rest) = Right (transitions, rest)
-parseFunctionEntriesAfterSemicolon alphabetMap states transitions tokens =
-    either
-        Left
-        (\(key, value, rest) ->
-            either
-                Left
-                (\updated -> parseFunctionEntriesTail alphabetMap states updated rest)
-                (insertTransition transitions key value)
-        )
-        (parseFunctionEntry alphabetMap states tokens)
+parseFunctionEntriesAfterSemicolon alphabetMap states transitions tokens = do
+    (key, value, rest) <- parseFunctionEntry alphabetMap states tokens
+    updated <- insertTransition transitions key value
+    parseFunctionEntriesTail alphabetMap states updated rest
 
 parseFunctionEntry :: AlphabetMap -> [String] -> [String] -> ParseResult ((String, Char), (String, Action), [String])
-parseFunctionEntry alphabetMap states (fromState:symbol:"->":toState:rest) =
-    either
-        Left
-        (\validatedFrom ->
-            either
-                Left
-                (\readChar ->
-                    either
-                        Left
-                        (\validatedTo ->
-                            either
-                                Left
-                                (\(action, restAfterAction) ->
-                                    Right ((validatedFrom, readChar), (validatedTo, action), restAfterAction)
-                                )
-                                (parseAction alphabetMap rest)
-                        )
-                        (validateStateInList "next" states toState)
-                )
-                (parseSymbolChar alphabetMap symbol)
-        )
-        (validateStateInList "current" states fromState)
+parseFunctionEntry alphabetMap states (fromState:symbol:"->":toState:rest) = do
+    validatedFrom <- validateStateInList "current" states fromState
+    readChar <- parseSymbolChar alphabetMap symbol
+    validatedTo <- validateStateInList "next" states toState
+    (action, restAfterAction) <- parseAction alphabetMap rest
+    Right ((validatedFrom, readChar), (validatedTo, action), restAfterAction)
 parseFunctionEntry _ _ _ = Left "Error: Invalid function entry"
 
 parseAction :: AlphabetMap -> [String] -> ParseResult (Action, [String])
-parseAction alphabetMap ("w":symbol:rest) =
-    either
-        Left
-        (\ch -> Right (Write ch, rest))
-        (parseSymbolChar alphabetMap symbol)
-parseAction _ ("g":"left":rest) = Right (Move MoveLeft, rest)
-parseAction _ ("g":"right":rest) = Right (Move MoveRight, rest)
-parseAction _ ("c":name:rest)
-    | isNameToken name = Right (Call name, rest)
-    | otherwise = Left ("Error: Invalid machine name '" ++ name ++ "'")
-parseAction _ _ = Left "Error: Invalid function result"
+parseAction alphabetMap tokens =
+    case tokens of
+        ("w":symbol:rest) -> do
+            ch <- parseSymbolChar alphabetMap symbol
+            Right (Write ch, rest)
+        ("g":"left":rest) -> Right (Move MoveLeft, rest)
+        ("g":"right":rest) -> Right (Move MoveRight, rest)
+        ("c":name:rest)
+            | isNameToken name -> Right (Call name, rest)
+            | otherwise -> Left ("Error: Invalid machine name '" ++ name ++ "'")
+        _ -> Left "Error: Invalid function result"
 
 insertTransition :: MyMap (String, Char) (String, Action) -> (String, Char) -> (String, Action) -> ParseResult (MyMap (String, Char) (String, Action))
 insertTransition transitions key value =
