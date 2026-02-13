@@ -1,8 +1,9 @@
 module Parser where
 
 import Types     -- This gives us access to our data types like Machine, Action, etc.
-import Map       -- This gives us the AVL tree implementation for our machine's state
+import qualified Map as MyMap -- This gives us the AVL tree implementation for our machine's state
 import Tokenizer -- Give us access to the tokenizer and the isContained function
+import Data.Char (isAlphaNum)
 
 -- Project specifications recommend that we use Either for error messages
 type ParseResult a = Either String a
@@ -10,41 +11,91 @@ type ParseResult a = Either String a
 -- | This is a helper function to make it easier to work with Either in our parser.
 -- It allows us to chain parsing steps together without deeply nested case statements.
 either :: (a -> c) -> (b -> c) -> Either a b -> c
-either f _ (Left x) = f x
+either f _ (Left x) = f x 
 either _ g (Right y) = g y
+-- I know that either is already defined in the Prelude, but I wanted to include it here
+-- anyway so next time I read the code I don't have to remember what it does.
 
 -- | Extracts the alphabet list from the start of the program.
 -- Grammar: alphabet = { character_list } 
-parseAlphabet :: [String] -> ParseResult ([String], [String])
-parseAlphabet ("alphabet":rest) = 
-    let symbols = takeWhile (/= "machine") rest
-        remaining = dropWhile (/= "machine") rest
-    in if null symbols 
-       then Left "Error: Alphabet cannot be empty"
-       else Right (symbols, remaining)
-parseAlphabet _ = Left "Error: Program must start with 'alphabet = { ... }'"
+parseAlphabet :: [String] -> ParseResult (AlphabetMap, [String])
+parseAlphabet ("alphabet":"=":"{":rest) =
+    either
+        Left
+        (\(symbols, remaining) ->
+            if null symbols
+            then Left "Error: Alphabet cannot be empty"
+            else
+                either
+                    Left
+                    (\alphabetMap -> Right (alphabetMap, remaining))
+                    (buildAlphabetMap symbols)
+        )
+        (parseSymbolList rest)
+parseAlphabet _ = Left "Error: Expected 'alphabet = { ... }'"
 
--- | Checks if a character is valid according to the defined alphabet.
--- This fulfills the requirement to check if written chars belong to the alphabet.
-validateChar :: String -> [String] -> ParseResult String
-validateChar c alphabet =
-    if isContained c alphabet || c == "_"  -- "_" is the blank symbol 
-    then Right c
-    else Left ("Error: Character '" ++ c ++ "' is not in the defined alphabet.")
+-- | Parses a comma-separated list of symbols ending with '}'.
+-- Returns the symbols and the remaining tokens after the closing brace.
+parseSymbolList :: [String] -> ParseResult ([String], [String])
+parseSymbolList ("}":rest) = Right ([], rest)
+parseSymbolList (sym:"}":rest) =
+    if isNameToken sym
+    then Right ([sym], rest)
+    else Left ("Error: Invalid alphabet symbol '" ++ sym ++ "' (must be alphanumeric)")
+parseSymbolList (sym:",":rest) =
+    if isNameToken sym
+    then
+        either
+            Left
+            (\(more, remaining) -> Right (sym : more, remaining))
+            (parseSymbolList rest)
+    else Left ("Error: Invalid alphabet symbol '" ++ sym ++ "' (must be alphanumeric)")
+parseSymbolList _ = Left "Error: Invalid alphabet list (expected symbols separated by commas, ending with '}')"
+
+-- | Checks if a symbol is valid according to the defined alphabet.
+-- This fulfills the requirement to check if written symbols belong to the alphabet.
+isInAlphabet :: String -> AlphabetMap -> ParseResult String
+isInAlphabet sym alphabetMap
+    | sym == "_" = Right sym  -- "_" is the blank symbol
+    | otherwise =
+        case MyMap.lookup sym alphabetMap of
+            Just _ -> Right sym
+            Nothing -> Left ("Error: Symbol '" ++ sym ++ "' is not in the defined alphabet.")
+
+buildAlphabetMap :: [String] -> ParseResult AlphabetMap
+buildAlphabetMap = foldl insertUnique (Right Empty)
+    where
+        insertUnique acc sym =
+                either
+                        Left
+                        (\mapAcc ->
+                                case MyMap.lookup sym mapAcc of
+                                        Just _ -> Left ("Error: Duplicate alphabet symbol '" ++ sym ++ "'")
+                                        Nothing -> Right (MyMap.insert sym () mapAcc)
+                        )
+                        acc
+
+isNameToken :: String -> Bool
+isNameToken [] = False
+isNameToken token = all isAlphaNum token
 
 -- | The main entry point for the Parser (to be expanded Day 4-6).
 -- Currently only handles the very first part of the grammar.
-parseProgram :: String -> ParseResult [String]
+parseProgram :: String -> ParseResult Program
 parseProgram input =
     either
         Left
         (\tokens ->
             either
                 Left
-                (\(alphabet, _) ->
+                (\(alphabetMap, _) ->
                     -- For today, we just return the alphabet to prove it works.
                     -- Tomorrow, we will pass the remaining tokens to the machine parser.
-                    Right alphabet
+                    Right Program
+                        { globalAlphabet = alphabetMap
+                        , allMachines = Empty
+                        , startMachine = ""
+                        }
                 )
                 (parseAlphabet tokens)
         )
@@ -52,6 +103,8 @@ parseProgram input =
 
 -- | A small test helper for GHCi
 testParser :: String -> IO ()
-testParser input = case parseProgram input of
-    Left err -> putStrLn ("Failed: " ++ err)
-    Right res -> putStrLn ("Success! Alphabet found: " ++ show res)
+testParser input =
+    either
+        (\err -> putStrLn ("Failed: " ++ err))
+        (\res -> putStrLn ("Success! Alphabet found: " ++ show res))
+        (parseProgram input)

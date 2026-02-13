@@ -45,6 +45,8 @@ data Machine = Machine {
     transitions :: MyMap (String, Char) (String, Action)
 }
 
+type AlphabetMap = MyMap String ()
+
 instance Show Machine where
     show (Machine state initial halting transitions) =
         "Machine { state = " ++ show state ++
@@ -54,6 +56,7 @@ instance Show Machine where
         " }"
     
 data Program = Program {
-    alphabet :: [Char],
-    allMachines :: MyMap String Machine
+    globalAlphabet :: AlphabetMap,
+    allMachines :: MyMap String Machine,
+    startMachine :: String
 }
