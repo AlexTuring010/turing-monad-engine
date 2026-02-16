@@ -1,4 +1,5 @@
 module Map where
+import Prelude hiding (lookup) -- I realised late that 'lookup' is already a function in Prelude, had to hide it to avoid conflicts.
 import Types
 
 -- 1. We update the Node to store its height (an Int)
@@ -49,6 +50,15 @@ lookup target (Node _ k v l r)
     | target < k = lookup target l
     | target > k = lookup target r
     | otherwise = Just v
+
+-- Convert a map into a sorted list of key/value pairs.
+mapToList :: MyMap k v -> [(k, v)]
+mapToList Empty = []
+mapToList (Node _ k v left right) = mapToList left ++ [(k, v)] ++ mapToList right
+
+-- Get just the keys from the map as a list.
+mapKeys :: MyMap k v -> [k]
+mapKeys mapData = map fst (mapToList mapData)
 
 -- 5. The Rebalance Logic
 -- This checks the 4 cases (Left-Left, Left-Right, etc.)

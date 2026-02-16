@@ -24,7 +24,7 @@ isSyntaxChar :: Char -> Bool
 isSyntaxChar c = isContained c "{},=;"
 
 isNameChar :: Char -> Bool
-isNameChar = isAlphaNum
+isNameChar c = isAlphaNum c || c == '_'
 
 isSpaceChar :: Char -> Bool
 isSpaceChar ch = ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
@@ -40,11 +40,9 @@ tokenize = go []
         | isSyntaxChar c = go ([c] : acc) cs
         | c == '-' = goDash acc cs
         | c == '>' = Left "Error: Unexpected '>' (use '->')"
-        | c == '_' = go ("_" : acc) cs
         | isNameChar c = go (word : acc) rest
         | otherwise = Left ("Error: Invalid character '" ++ [c] ++ "' in input")
         where
             (word, rest) = spanWhile isNameChar (c:cs)
-
-        goDash acc ('>':rest) = go ("->" : acc) rest
-        goDash _ _ = Left "Error: Unexpected '-' (use '->')"
+            goDash acc ('>':rest) = go ("->" : acc) rest
+            goDash _ _ = Left "Error: Unexpected '-' (use '->')"

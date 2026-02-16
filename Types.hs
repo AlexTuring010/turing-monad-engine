@@ -1,7 +1,7 @@
 module Types where
 
-data Tape = Tape [Char] [Char]
--- Example: Tape ['b', 'a'] ['c', 'd'] 
+data Tape = Tape [String] [String]
+-- Example: Tape ["b", "a"] ["c", "d"]
 -- represents a tape like ... a b [c] d ...
 
 data Direction = MoveLeft | MoveRight
@@ -15,16 +15,16 @@ instance Show Direction where
     show MoveLeft = "MoveLeft"
     show MoveRight = "MoveRight"
 
-data Action = Write Char | Move Direction | Call String
+data Action = Write String | Move Direction | Call String
 
 instance Eq Action where
-    (Write c1) == (Write c2) = c1 == c2
+    (Write s1) == (Write s2) = s1 == s2
     (Move d1) == (Move d2) = d1 == d2
     (Call s1) == (Call s2) = s1 == s2
     _ == _ = False
 
 instance Show Action where
-    show (Write c) = "Write " ++ [c]
+    show (Write s) = "Write " ++ s
     show (Move d) = "Move " ++ show d
     show (Call s) = "Call " ++ s
 
@@ -42,7 +42,7 @@ data Machine = Machine {
     state :: [String],
     initial :: String,
     halting :: [String],
-    transitions :: MyMap (String, Char) (String, Action)
+    transitions :: MyMap (String, String) (String, Action)
 }
 
 type AlphabetMap = MyMap String ()
@@ -60,3 +60,10 @@ data Program = Program {
     allMachines :: MyMap String Machine,
     startMachine :: String
 }
+
+instance Show Program where
+    show (Program globalAlphabet allMachines startMachine) =
+        "Program { globalAlphabet = " ++ show globalAlphabet ++
+        ", allMachines = " ++ show allMachines ++
+        ", startMachine = " ++ show startMachine ++
+        " }"

@@ -1,0 +1,9 @@
+alphabet = {a, b}
+machine start = {
+  states = {s, e}
+  init_state = {s}
+  halting_states = {e}
+  function = {
+    s _ -> e w c;
+  }
+}
