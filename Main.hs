@@ -13,6 +13,10 @@ import Data.Char (isSpace)
 trim :: String -> String
 trim = dropWhile isSpace . reverse . dropWhile isSpace . reverse
 
+-- | Remove all blanks from tape
+removeAllBlanks :: [String] -> [String]
+removeAllBlanks = filter (/= "_")
+
 validateInput :: AlphabetMap -> String -> Either String String
 validateInput alphabetMap s =
     let symbols = words s
@@ -45,7 +49,7 @@ getUserInput alphabetMap = do
 
 formatOutput :: (String, [String]) -> String
 formatOutput (haltingState, finalTape) =
-    "Final tape (including blanks): " ++ unwords finalTape ++ 
+    "Final tape (non-blank Characters): " ++ unwords (removeAllBlanks finalTape) ++
        "\nTermination state: " ++ haltingState
 
 -- | Coordinator function that orchestrates the pipeline

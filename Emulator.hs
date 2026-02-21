@@ -28,8 +28,8 @@ moveLeft tape = tape  -- Already at first cell, no movement
 
 -- | Move the head right
 moveRight :: Tape -> Tape
-moveRight (Tape left (r:rs)) = Tape (r:left) rs
-moveRight (Tape left []) = Tape left ["_"]  -- move to implicit blank
+moveRight (Tape left (r:rs)) = Tape (r:left) (if null rs then ["_"] else rs)
+moveRight (Tape left []) = Tape left ["_"]  -- Should never happen since we always ensure there's at least one cell
 
 -- | Convert a list of symbols to a Tape with focus at the first cell
 fromList :: [String] -> Tape
