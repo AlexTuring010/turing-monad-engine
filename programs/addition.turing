@@ -420,8 +420,8 @@ machine zip = {
         insert_0 1 -> insert_0 w 0; -- Should never happen
         insert_0 plus -> insert_0 c shift_right;
 
-        return_right _ -> fix_second_blank_bug g right; -- A bug I discovered, append has created a second blank I wasnt taking account of before
-        return_right 0 -> return_right g right;
+        return_right _ -> fix_second_blank_bug g right; -- I realised I was forgetting to remove a blank so this is why
+        return_right 0 -> return_right g right;         -- I created this extra state and named this that to remember my stupidity
         return_right 1 -> return_right g right;
         return_right plus -> return_right g right;
 
@@ -481,32 +481,32 @@ machine sum_bits = {
         read_cin 1 -> 1_x_x g right;
         read_cin plus -> exit g left; -- Shouldnt happen
 
-        0_x_x _ -> 0_0_x c shift_left; -- Treat blank as 0
+        0_x_x _ -> 0_0_x w 0; -- Treat blank as 0
         0_x_x 0 -> 0_0_x c shift_left;
         0_x_x 1 -> 0_1_x c shift_left;
         0_x_x plus -> exit g left; -- Shouldnt happen
 
-        0_0_x _ -> 0_0_0 c shift_left; -- Treat blank as 0
+        0_0_x _ -> 0_0_0 w 0; -- Treat blank as 0
         0_0_x 0 -> 0_0_0 c shift_left; 
         0_0_x 1 -> 0_0_1 c shift_left;
         0_0_x plus -> exit g left; -- Shouldnt happen
 
-        0_1_x _ -> 0_1_0 c shift_left; -- Treat blank as 0
+        0_1_x _ -> 0_1_0 w 0; -- Treat blank as 0
         0_1_x 0 -> 0_1_0 c shift_left;
         0_1_x 1 -> 0_1_1 c shift_left;
         0_1_x plus -> exit g left; -- Shouldnt happen
 
-        1_x_x _ -> 1_0_x c shift_left; -- Treat blank as 0
+        1_x_x _ -> 1_0_x w 0; -- Treat blank as 0
         1_x_x 0 -> 1_0_x c shift_left;
         1_x_x 1 -> 1_1_x c shift_left;
         1_x_x plus -> exit g left; -- Shouldnt happen
 
-        1_0_x _ -> 1_0_0 c shift_left; -- Treat blank as 0
+        1_0_x _ -> 1_0_0 w 0; -- Treat blank as 0
         1_0_x 0 -> 1_0_0 c shift_left; 
         1_0_x 1 -> 1_0_1 c shift_left;
         1_0_x plus -> exit g left; -- Shouldnt happen
 
-        1_1_x _ -> 1_1_0 c shift_left; -- Treat blank as 0
+        1_1_x _ -> 1_1_0 w 0; -- Treat blank as 0
         1_1_x 0 -> 1_1_0 c shift_left;
         1_1_x 1 -> 1_1_1 c shift_left;
         1_1_x plus -> exit g left; -- Shouldnt happen
@@ -712,7 +712,7 @@ machine adder = {
         find_plus 1 -> find_plus g right;
         find_plus plus -> recurse w _;
 
-        return_left _ -> end w _;
+        return_left _ -> finish w _;
         return_left 0 -> return_left g left;
         return_left 1 -> return_left g left;
         return_left plus -> return_left g left;
@@ -783,7 +783,7 @@ machine adder = {
         is_done 1 -> is_done g left;
         is_done plus -> is_done g left; -- Should never happen    
 
-        finish _ -> end c normalize_number; -- Not necessary but makes this prettier
+        finish _ -> end c normalize_number; -- Without this input like plus plus plus is having issues, adding that zero makes the zipper work wihout having to do some work around
         finish 0 -> finish c shift_right; -- This is because reverse has brought the result on the start
         finish 1 -> finish c shift_right; -- however we want the end tape to be [_] result, important for recursion
         finish plus -> finish w _; -- Should never happen;

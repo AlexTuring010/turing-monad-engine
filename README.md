@@ -1,75 +1,82 @@
-# Recursive Turing Machine Interpreter
+# Turing Machine Emulator
 
-A low-level language implementation that executes on an extended, recursive Turing Machine model. This project is developed as part of the **Principles of Programming Languages** course (2025-2026).
+**Όνομα:** Αλεξανδρος Γκιάφης  
+**ΑΜ:** sdi2200284
 
-## Overview
-The goal is to implement a parser and an execution system for a language where multiple Turing machines can share a single tape and call each other recursively.
+## Πώς να το τρέξεις
 
-## Key Features (Requirements)
-* **Custom Data Structures**: Implementation of a balanced Binary Search Tree (Map) for $O(\log n)$ lookup of machines and transitions.
-* **Infinite Tape**: Efficient tape representation using dual-list logic.
-* **Recursive Engine**: Support for machine calls using a call stack to track return states.
-* **Functional Parser**: A grammar-based parser implemented using Haskell's `Either` and `Maybe` monads for robust error handling.
+Πρώτα compile με:
+```bash
+ghc --make Main.hs -o rTM -outputdir build
+```
 
-## Language Syntax
-The interpreter handles:
-- **Alphabet**: User-defined symbols.
-- **Actions**: Write (`w`), Move (`g`), and Call (`c`).
-- **Machines**: Defined by states, initial/halting configurations, and transition functions.
+Μετά μπορείς να δοκιμάσεις ένα αρχείο:
+```bash
+./rTM programs/reverse.turing
+```
 
-## Tech Stack
-- **Language**: Haskell
-- **Compiler**: GHC
-- **No External Dependencies**: Built strictly using core Haskell modules.
+## Πώς δουλεύει
 
-## Usage
-Compilation:
-`ghc --make Main.hs -o rTM`
+Το project είναι χωρισμένο σε πολλά αρχεία που δουλεύουν μαζί:
 
-Execution:
-`./rTM <program_file>`
+- **Main.hs**: Διαχειρίζεται τα I/O, παίρνει τα arguments και την αρχική tape από τον χρήστη
+- **Tokenizer.hs**: Κόβει το αρχείο σε tokens
+- **Parser.hs**: Χρησιμοποιεί τα tokens για να φτιάξει μια δομή δεδομένων με όλες τις πληροφορίες που χρειάζεται ο emulator (αλφάβητο, μηχανές, καταστάσεις, transitions). Αποθηκεύει όλα αυτά σε Maps (AVL trees με O(log n) αναζήτηση). Ο Parser κάνει και semantic analysis: ελέγχει completeness (αν είναι πλήρες), αν υπάρχουν όλες οι μηχανές που καλούνται, αν υπάρχει η start μηχανή, αν υπάρχουν duplicates, κ.λπ.
+- **Emulator.hs**: Τρέχει το πρόγραμμα χωρίς να χρειάζεται να κάνει πολλούς ελέγχους, γιατί ο Parser ήδη σιγουρέψε  ότι όλα είναι σωστά
+- **Types.hs**: Ορισμός των τύπων δεδομένων
+- **Map.hs**: Υλοποιεί AVL trees (ισορροπημένα δυαδικά δέντρα αναζήτησης) για να αποθηκεύονται αποδοτικά οι μηχανές, οι καταστάσεις και τα transitions. Περιέχει insert, lookup, rebalance, και βοηθητικές συναρτήσεις για να δουλεύει το Map σαν efficient dictionary.
 
-## Writing Programs
-The interpreter follows the specific grammar and syntax rules outlined in the project documentation. 
+Επίσης, έχω προσθέσει τη δυνατότητα να βάζετε σχόλια της μορφής `-- comment` μέσα στα αρχεία προγραμμάτων. Ο tokenizer μου αγνοεί αυτά τα σχόλια μέχρι το newline, οπότε μπορείτε να γράφετε ό,τι θέλετε για επεξηγήσεις χωρίς να επηρεάζεται η εκτέλεση.
 
-For detailed information on the alphabet, machine definitions, and transition functions, please refer to the [Project Specification (PDF)](./Project_2025-2026.pdf).
+## Τι έχω δοκιμάσει
 
-### Parsable Example Program
-The following program defines a simple routine: it clears any immediate data and then prints "hi" on the tape. 
+Ο Parser πιάνει λάθη και ο Emulator φαίνεται να δουλεύει σωστά. Έχω υλοποιήσει δύο προγράμματα:
 
-```text
-alphabet = {h, i}
+### 1. Reverse (programs/reverse.turing)
+Δίνεις μια σειρά από σύμβολα (a, b, c, ...) και σου τα επιστρέφει ανάποδα.
 
-machine clear_tape = {
-  states = {s, c1, c2, c3, e}
-  init_state = {s}
-  halting_states = {e}
-  function = {
-    s _ -> c1 w h;
-    c1 h -> c2 g right;
-    c2 i -> c1 w _;
-    c2 _ -> c3 g left;
-    c3 h -> e w _;
-  }
-}
+### 2. Binary Addition (programs/addition.turing)
+Αυτό ήταν το βαρύ project. Κάνει binary πρόσθεση για αριθμούς της μορφής `1 0 1 plus 1 0 plus 1 plus ...`
 
-machine print_hi = {
-  states = {s, q, p, e}
-  init_state = {s}
-  halting_states = {e}
-  function = {
-    s _ -> q w h;
-    q _ -> p g right;
-    p _ -> e w i;
-  }
-}
+Δουλεύει για οποιαδήποτε είσοδο, ακόμα και για περίεργες!
 
-machine start = {
-  states = {s, q, e}
-  init_state = {s}
-  halting_states = {e}
-  function = {
-    s _ -> q c clear_tape;
-    q _ -> e c print_hi;
-  }
-}
+Δοκιμάστε:
+- `plus plus plus` (επιστρέφει 0)
+- `1 plus plus plus 1 plus` (επιστρέφει 10)
+- `0 plus 0 plus 0 plus 0` (επιστρέφει 0)
+- `1 0 1 plus 1 0 plus 1 plus` (επιστρέφει 1000)
+- `plus 1 plus 0 plus 1 plus plus` (επιστρέφει 10)
+
+Δοκιμάστε ό,τι συνδυασμό θέλετε, δεν θα σπάσει! (ελπίζω)
+
+Η στρατηγική που ακολούθησα είναι πολύ ενδιαφέρουσα, βασίζεται στην αναδρομή:
+
+Όταν δώσω είσοδο όπως `[_] 1 0 1 plus 1 0 plus 1`, το πρόγραμμα θα βρει το πρώτο `plus` και θα το αλλάξει σε `_`, οπότε θα έχουμε:
+`1 0 1 [_] 1 0 plus 1`
+Μετά θα καλέσει αναδρομικά τον εαυτό του για να υπολογίσει την πρόσθεση.
+
+Όταν υπολογιστεί, θα έχουμε:
+`_ 1 0 1 [_] 1 1`
+και θα βάλει πίσω το `plus`:
+`_ 1 0 1 [plus] 1 1`
+Στη συνέχεια, ο emulator επιστρέφει πίσω στην αρχή και καλεί το μηχάνημα `zip`, το οποίο ευθυγραμμίζει τα bits των δύο αριθμών σε ζευγάρια, προσθέτοντας μηδενικά όταν ένα έχει περισσότερα bits.
+
+Έτσι θα φτιαχτεί το `[_] 0 1 0 1 1 1`, και μετά τα κάνει reverse γιατί θέλει να βλέπει τα ζευγάρια από least significant πρώτα προς most significant (`[_] 1 1 1 0 1 0`). (Χρησιμοποίησα το ίδιο μηχάνημα που υλοποίησα στο πρόγραμμα reverse.)
+
+Στη συνέχεια χρησιμοποιεί το μηχάνημα `sum_bits` για να προσθέτει τα bits ένα-ένα. Το μηχάνημα αυτό παίρνει είσοδο:
+`[_] carry_in A B x x`
+και υπολογίζει:
+`[sum] carry_out x x`
+Οπότε κάπως έτσι φτιάχνω τον αριθμό, κάνοντας shift_right για να βάζω τα αποτελέσματα το ένα μετά το άλλο, και στο τέλος κάνω ένα τελευταίο reverse για να είναι τα least significant bits στα δεξιά.
+
+Νομίζω το zip είναι επίσης πολύ ενδιαφέρον μηχάνημα. Παίρνει input της μορφής `_ 1 0 1 plus 1 1` και κάνει ζευγάρια τα bits, χειρίζεται περιπτώσεις όπως `_ plus 1 1` ή `_ 1 1 plus _` και γενικά αριθμούς με διαφορετικό πλήθος bits, προσθέτοντας μηδενικά για να φτιάξει ζευγάρια.
+
+Αρχικά, πάει στο τέλος του αριθμού (`_ 1 0 1 plus 1 1 [_]`). Στη συνέχεια αρχίζει να διαβάζει προς τα αριστερά. Για κάθε αριθμό που βρίσκει, κάνει δύο φορές shift_right για να δημιουργήσει την τρύπα (`_ 1 0 1 plus 1 [_] _ 1`). Θα γίνει σύντομα προφανές γιατί δύο φορές: στη συνέχεια διατρέχει προς τα αριστερά μέχρι να βρει το πρώτο στοιχείο μετά το plus (`_ 1 0 [1] plus 1 _ _ 1`). Σε αυτή τη φάση, μπορεί να κάνει ένα απλό append, και αυτό θα βάλει το 1 στην τρύπα που είχαμε δημιουργήσει, εύκολα, χωρίς να χρειάζεται να πηγαίνω πίσω και να θυμάμαι τι είχα διαβάσει.
+
+`_ 1 0 [plus] 1 1 _ _ 1`, έπειτα μπορώ να πάω πίσω, να κλείσω την τρύπα που είχα φτιάξει και να επαναλάβω για τον επόμενο αριθμό (`_ 1 0 plus 1 1 [_] _ 1 <=> _ 1 0 plus [1] 1 1 <=> _ 1 [plus] 0 1 1 1`).
+
+Σε κάποια φάση φτάνω στο plus αλλά η αριστερή λίστα έχει ακόμα ψηφία. Εδώ κάνω αριστερό swap (`_ plus [1] 0 1 1 1`) και αν το στοιχείο που διαβάζω δεν είναι κενό, τότε προσθέτω ένα μηδενικό (`_ [plus] 0 1 0 1 1 1`) και επαναλαμβάνω. Αυτή τη φορά μετά το swap θα είναι κενό plus (`plus [_] 0 1 0 1 1 1`), οπότε μπορώ να κάνω ένα swap να φέρω το plus πίσω και να κάνω ένα shift_left για να διαγραφεί το plus και να πάω τον header μια αριστερά, οπότε θα έχω `[_] 0 1 0 1 1 1`.
+
+Έτσι χειρίζομαι την περίπτωση που η αριστερή λίστα έχει περισσότερα στοιχεία. Η περίπτωση που η δεξιά λίστα έχει περισσότερα στοιχεία προβλέπεται επίσης: π.χ. εδώ (`_ plus 1 [_] _ 1 0 0`) θα πάω αριστερά να βρω ζευγάρι για το ψηφίο 1 που είναι δεξιά από το κενό που έφτιαξα. Μετά το plus θα βρω κενό, σωστά; Όταν βρω το κενό, θα κάνω ένα shift_right και θα γράψω ένα μηδενικό (`_ [0] plus 1 _ 1 0`), οπότε τώρα μπορώ να κάνω append το μηδενικό και να συνεχίσω (`_ [plus] 1 0 _ 1 0`) επιστρεφοντας πισω για να κλείσω την τρίπα.
+
+Γι' αυτό χρειάζονται δύο κενά! Αν είχαμε μόνο ένα, το shift_right θα το έκλεινε και η append θα έσπρωχνε το 0 στο τέλος της λίστας, με αποτέλεσμα να βγει κάτι περίεργο. Με δύο κενά, το 0 μπαίνει σωστά στη θέση του και όλα δουλεύουν όπως πρέπει.
