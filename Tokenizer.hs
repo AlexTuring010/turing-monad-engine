@@ -31,6 +31,7 @@ isSpaceChar ch = ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r'
 
 -- Turns the raw string into a list of clean tokens
 -- Keeps symbols and the "->" operator as separate tokens.
+-- Comments starting with -- and extending to newline (or EOF) are ignored.
 tokenize :: String -> Either String [String]
 tokenize = go []
   where
@@ -44,5 +45,11 @@ tokenize = go []
         | otherwise = Left ("Error: Invalid character '" ++ [c] ++ "' in input")
         where
             (word, rest) = spanWhile isNameChar (c:cs)
-            goDash acc ('>':rest) = go ("->" : acc) rest
+            goDash acc ('-':rest) = go acc (skipComment rest)  -- comment
+            goDash acc ('>':rest) = go ("->" : acc) rest       -- arrow
             goDash _ _ = Left "Error: Unexpected '-' (use '->')"
+            skipComment [] = []
+            skipComment ('\n':xs) = xs
+            skipComment (_:xs) = skipComment xs
+-- The grammar does not define comments, however I added them because it makes my addition.turing and reverse.turing
+-- programs much easier to read and write, its a simple extension that does not effect the core logic.

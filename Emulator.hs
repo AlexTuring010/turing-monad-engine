@@ -50,14 +50,15 @@ toList (Tape left right) = reverse left ++ right
 pushCall :: Program -> String -> String -> ExecutionContext -> Either String ExecutionContext
 pushCall program calledMachine returnState ctx =
     case MyMap.lookup calledMachine (allMachines program) of
-        Nothing -> Left ("Error: Machine '" ++ calledMachine ++ "' not found")
+        Nothing -> 
+            Left ("Error: Machine '" ++ calledMachine ++ "' not found")
         Just machine -> 
-            let newStack = (currentMachine ctx, returnState) : callStack ctx
-                newCtx = ctx { callStack = newStack
-                             , currentMachine = calledMachine
-                             , currentState = initial machine
-                             }
-            in Right newCtx
+            Right ctx { callStack = (currentMachine ctx, returnState) : callStack ctx
+                      , currentMachine = calledMachine
+                      , currentState = initial machine
+                      }
+-- Note: the stack only contains the caller chain, not the current machine 
+-- since the current machine is tracked separately in the context. 
 
 -- | Pop a machine call from the stack, restoring the previous machine and state
 popCall :: ExecutionContext -> Either String ExecutionContext
@@ -73,13 +74,13 @@ popCall ctx =
 -- | Get the current machine from the program
 -- Safe to use unsafe pattern matching because parser guarantees all referenced machines exist
 getCurrentMachine :: Program -> ExecutionContext -> Machine
-getCurrentMachine program ctx =
-    let Just machine = MyMap.lookup (currentMachine ctx) (allMachines program)
-    in machine
+getCurrentMachine program ctx = machine
+    where
+        Just machine = MyMap.lookup (currentMachine ctx) (allMachines program)
 
 {-------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------
--- Functions for the emulation of the program ----------------------------------------
+-- Functions for the emulation of the recursive turing machine -----------------------
 --------------------------------------------------------------------------------------
 --------------------------------------------------------------------------------------}
 
@@ -87,32 +88,32 @@ getCurrentMachine program ctx =
 -- Returns either an error or a tuple of (halting state, final tape contents)
 -- Safe to unwrap machine lookup because parser ensures 'start' machine always exists
 runEmulator :: Program -> [String] -> Either String (String, [String])
-runEmulator program initialSymbols =
-    let tape = fromList initialSymbols
+runEmulator program initialSymbols = emulationLoop program initialContext
+    where
+        tape = fromList initialSymbols
         Just startMachine = MyMap.lookup "start" (allMachines program)
         initialContext = ExecutionContext
-                { currentMachine = "start"
-                , currentState = initial startMachine
-                , tape = tape
-                , callStack = []
-                }
-    in emulationLoop program initialContext
+                        { currentMachine = "start"
+                        , currentState = initial startMachine
+                        , tape = tape
+                        , callStack = []
+                        }
 
 -- | Execute a Write action: update tape and state
 executeWrite :: Program -> ExecutionContext -> String -> String -> Either String (String, [String])
-executeWrite program ctx sym nextState =
-    let newTape = writeCell (tape ctx) sym
+executeWrite program ctx sym nextState = emulationLoop program newCtx
+    where
+        newTape = writeCell (tape ctx) sym
         newCtx = ctx { tape = newTape, currentState = nextState }
-    in emulationLoop program newCtx
 
 -- | Execute a Move action: update tape (respecting boundaries) and state
 executeMove :: Program -> ExecutionContext -> Direction -> String -> Either String (String, [String])
-executeMove program ctx dir nextState =
-    let newTape = case dir of
-            MoveLeft -> moveLeft (tape ctx)
-            MoveRight -> moveRight (tape ctx)
-        newCtx = ctx { tape = newTape, currentState = nextState }
-    in emulationLoop program newCtx
+executeMove program ctx dir nextState = emulationLoop program newCtx
+  where
+    newTape = case dir of
+        MoveLeft -> moveLeft (tape ctx)
+        MoveRight -> moveRight (tape ctx)
+    newCtx = ctx { tape = newTape, currentState = nextState }
 
 -- | Execute a Call action: push onto call stack and switch machines
 executeCall :: Program -> ExecutionContext -> String -> String -> Either String (String, [String])
@@ -123,35 +124,40 @@ executeCall program ctx machName nextState =
 
 -- | Check if in halting state; if so, either return or pop stack
 -- Parser guarantees: halting states have no outgoing transitions, so we safely halt here
-checkHalting :: Program -> ExecutionContext -> Either String (Maybe (String, [String]))
+checkHalting :: Program -> ExecutionContext -> Either String (ExecutionContext, Maybe (String, [String]))
 checkHalting program ctx =
-    let currentMachineObj = getCurrentMachine program ctx
-    in if currentState ctx `elem` halting currentMachineObj
+    if currentState ctx `elem` halting currentMachineObj
         then case callStack ctx of
-            [] -> Right (Just (currentState ctx, toList (tape ctx)))
+            [] -> Right (ctx, Just (currentState ctx, toList (tape ctx)))
             _ -> case popCall ctx of
                 Left err -> Left err
                 Right newCtx -> checkHalting program newCtx
-        else Right Nothing  -- Not halting, continue with transition
+    else Right (ctx, Nothing)  -- Not halting, continue with transition
+    where
+        currentMachineObj = getCurrentMachine program ctx
+-- Above I initially had this tricky bug because I was not returning back the ctx, this is why we return it now
+-- Its because when we reach a halting state, we may pop back to a caller, and that caller may also be in a halting 
+-- state, and anyway, if we dont return the updated ctx, emulationLoop will still use the old one causing weird bugs 
+-- like calling executeTransition for a halting state.
 
 -- | Look up and execute a transition
 -- Parser guarantees: all non-halting states have transitions for every symbol (completeness check)
--- So (currentState, symbol) lookup will always succeed
 executeTransition :: Program -> ExecutionContext -> Either String (String, [String])
 executeTransition program ctx =
-    let currentMachineObj = getCurrentMachine program ctx
-        symbol = readCell (tape ctx)
-        key = (currentState ctx, symbol)
-        Just (nextState, action) = MyMap.lookup key (transitions currentMachineObj)
-    in case action of
+    case action of
         Write sym -> executeWrite program ctx sym nextState
         Move dir -> executeMove program ctx dir nextState
         Call machName -> executeCall program ctx machName nextState
+    where
+        currentMachineObj = getCurrentMachine program ctx
+        symbol = readCell (tape ctx)
+        key = (currentState ctx, symbol)
+        Just (nextState, action) = MyMap.lookup key (transitions currentMachineObj)
 
 -- | The main emulation loop - orchestrates termination checks and transitions
 emulationLoop :: Program -> ExecutionContext -> Either String (String, [String])
 emulationLoop program ctx =
     case checkHalting program ctx of
         Left err -> Left err
-        Right Nothing -> executeTransition program ctx  -- Not halting, proceed with transition
-        Right (Just result) -> Right result  -- Halting, return result
+        Right (_, Just result) -> Right result  -- Halting, return result
+        Right (updatedCtx, Nothing) -> executeTransition program updatedCtx  -- Not halting, proceed with transition using updated context

@@ -1,7 +1,0 @@
-alphabet = {a}
-machine start = {
-  states = {s, q1}
-  init_state = {s}
-  halting_states = {e} 
-  function = { s _ -> q1 g right; }
-}

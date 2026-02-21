@@ -1,7 +1,0 @@
-alphabet = {a}
-machine helper = {
-  states = {s, e}
-  init_state = {s}
-  halting_states = {e}
-  function = { s _ -> e g right; }
-}

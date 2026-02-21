@@ -1,0 +1,806 @@
+alphabet = {0, 1, plus}
+
+machine swap = {
+  -- Visually the algorithm does this:
+  -- [a] b
+  -- [b] a
+  -- Can work with blanks too:
+  -- [_] b
+  -- [b] _
+  
+  states = {start, 
+          from_blank, from_0, from_1, from_plus, 
+          blank_to_0, blank_to_1, blank_to_plus, 
+          0_to_blank, 0_to_1, 0_to_plus, 
+          1_to_blank, 1_to_0, 1_to_plus, 
+          plus_to_blank, plus_to_0, plus_to_1, 
+          write_blank, write_0, write_1, write_plus, end}
+  init_state = {start}
+  halting_states = {end}
+  function = {
+    start _ -> from_blank g right;
+    start 0 -> from_0 g right;
+    start 1 -> from_1 g right;
+    start plus -> from_plus g right;
+
+    -- From blank chain:
+
+    from_blank _ -> end g left;
+    from_blank 0 -> blank_to_0 w _;
+    from_blank 1 -> blank_to_1 w _;
+    from_blank plus -> blank_to_plus w _;
+
+    blank_to_0 _ -> write_0 g left;
+    blank_to_0 0 -> blank_to_0 w _; -- Should never happen
+    blank_to_0 1 -> blank_to_1 w _; -- Should never happen
+    blank_to_0 plus -> blank_to_plus w _; -- Should never happen
+
+    blank_to_1 _ -> write_1 g left;
+    blank_to_1 0 -> blank_to_0 w _; -- Should never happen
+    blank_to_1 1 -> blank_to_1 w _; -- Should never happen
+    blank_to_1 plus -> blank_to_plus w _; -- Should never happen
+
+    blank_to_plus _ -> write_plus g left;
+    blank_to_plus 0 -> blank_to_0 w _; -- Should never happen
+    blank_to_plus 1 -> blank_to_1 w _; -- Should never happen
+    blank_to_plus plus -> blank_to_plus w _; -- Should never happen
+
+    -- From a chain:
+  
+    from_0 _ -> 0_to_blank w 0;
+    from_0 0 -> end g left;
+    from_0 1 -> 0_to_1 w 0;
+    from_0 plus -> 0_to_plus w 0;
+
+    0_to_blank 0 -> write_blank g left;
+    0_to_blank _ -> 0_to_blank w 0; -- Should never happen
+    0_to_blank 1 -> 0_to_1 w 0; -- Should never happen
+    0_to_blank plus -> 0_to_plus w 0; -- Should never happen
+
+    0_to_1 0 -> write_1 g left;
+    0_to_1 _ -> 0_to_blank w 0; -- Should never happen
+    0_to_1 1 -> 0_to_1 w 0; -- Should never happen
+    0_to_1 plus -> 0_to_plus w 0; -- Should never happen
+
+    0_to_plus 0 -> write_plus g left;
+    0_to_plus _ -> 0_to_blank w 0; -- Should never happen
+    0_to_plus 1 -> 0_to_1 w 0; -- Should never happen
+    0_to_plus plus -> 0_to_plus w 0; -- Should never happen
+
+    -- From b chain:
+
+    from_1 _ -> 1_to_blank w 1;
+    from_1 0 -> 1_to_0 w 1;
+    from_1 1 -> end g left;
+    from_1 plus -> 1_to_plus w 1;
+
+    1_to_blank 1 -> write_blank g left;
+    1_to_blank _ -> 1_to_blank w 1; -- Should never happen
+    1_to_blank 0 -> 1_to_0 w 1; -- Should never happen
+    1_to_blank plus -> 1_to_plus w 1; -- Should never happen
+
+    1_to_0 1 -> write_0 g left;
+    1_to_0 _ -> 1_to_blank w 1; -- Should never happen
+    1_to_0 0 -> 1_to_0 w 1; -- Should never happen
+    1_to_0 plus -> 1_to_plus w 1; -- Should never happen
+
+    1_to_plus 1 -> write_plus g left;
+    1_to_plus _ -> 1_to_blank w 1; -- Should never happen
+    1_to_plus 0 -> 1_to_0 w 1; -- Should never happen
+    1_to_plus plus -> 1_to_plus w 1; -- Should never happen
+
+    -- From c chain:
+
+    from_plus _ -> plus_to_blank w plus;
+    from_plus 0 -> plus_to_0 w plus;
+    from_plus 1 -> plus_to_1 w plus;
+    from_plus plus -> end g left;
+
+    plus_to_blank plus -> write_blank g left;
+    plus_to_blank _ -> plus_to_blank w plus; -- Should never happen
+    plus_to_blank 0 -> plus_to_0 w plus; -- Should never happen
+    plus_to_blank 1 -> plus_to_1 w plus; -- Should never happen
+
+    plus_to_0 plus -> write_0 g left;
+    plus_to_0 _ -> plus_to_blank w plus; -- Should never happen
+    plus_to_0 0 -> plus_to_0 w plus; -- Should never happen
+    plus_to_0 1 -> plus_to_1 w plus; -- Should never happen
+
+    plus_to_1 plus -> write_1 g left;
+    plus_to_1 _ -> plus_to_blank w plus; -- Should never happen
+    plus_to_1 0 -> plus_to_0 w plus; -- Should never happen
+    plus_to_1 1 -> plus_to_1 w plus; -- Should never happen
+
+    -- The finish states 
+
+    write_blank _ -> end w _;
+    write_blank 0 -> end w _;
+    write_blank 1 -> end w _;
+    write_blank plus -> end w _;
+
+    write_0 _ -> end w 0;
+    write_0 0 -> end w 0;
+    write_0 1 -> end w 0;
+    write_0 plus -> end w 0;
+
+    write_1 _ -> end w 1;
+    write_1 0 -> end w 1;
+    write_1 1 -> end w 1;
+    write_1 plus -> end w 1;
+
+    write_plus _ -> end w plus;
+    write_plus 0 -> end w plus;
+    write_plus 1 -> end w plus;
+    write_plus plus -> end w plus;
+  }
+}
+
+machine left_swap = {
+    -- Visually the algorithm does this:
+    -- a [b]
+    -- b [a]
+    -- Can work with blanks too:
+    -- _ [b]
+    -- b [_]
+    -- Careful, calling this at the start of the tape would cause  a right swap:
+    -- [_] b
+    -- b [_]
+
+    states = {start, go_left, go_right, end}
+    init_state = {start}
+    halting_states = {end}
+    function = {
+        start _ -> go_left g left;
+        start 0 -> go_left g left;
+        start 1 -> go_left g left;
+        start plus -> go_left g left;
+
+        go_left _ -> go_right c swap;
+        go_left 0 -> go_right c swap;
+        go_left 1 -> go_right c swap;
+        go_left plus -> go_right c swap;
+
+        go_right _ -> end g right;
+        go_right 0 -> end g right;
+        go_right 1 -> end g right;
+        go_right plus -> end g right;
+    }
+}
+
+machine append = {
+  -- Visually the algorithm does this:
+  -- [a] b b b b b b b b b a _
+  -- [b] b b b b b b b b a a _
+  -- Can work on empty lists like this:
+  -- [a] _
+  -- [a] _
+  -- Inserting an _ is basically just shift_left
+  -- [_] b b b b b b b b b a
+  -- [b] b b b b b b b b a
+
+  states = {start, swapped, recurse, finish, end}
+  init_state = {start}
+  halting_states = {end}
+  function = {
+    start _ -> swapped c swap;
+    start 0 -> swapped c swap;
+    start 1 -> swapped c swap;
+    start plus -> swapped c swap;
+
+    swapped _ -> end c swap; -- The recursion ends here
+    swapped 0 -> recurse g right;
+    swapped 1 -> recurse g right;
+    swapped plus -> recurse g right;
+
+    recurse _ -> finish c append;
+    recurse 0 -> finish c append;
+    recurse 1 -> finish c append;
+    recurse plus -> finish c append;
+
+    finish _ -> end g left;
+    finish 0 -> end g left;
+    finish 1 -> end g left;
+    finish plus -> end g left;
+  }
+}
+
+machine reverse = {
+  -- Visually the algorithm does this:
+  -- [a] b c b c _
+  -- [c] b c b a _
+  -- Of course this would also work though:
+  -- [_] a b c b c _
+  -- [c] b c b a _
+  -- Since the blank will be put at the end. Both will do the same thing
+
+  states = {start, recurse, finish, call_append, end}
+  init_state = {start}
+  halting_states = {end}
+  function = {
+    start _ -> recurse g right;
+    start 0 -> recurse g right;
+    start 1 -> recurse g right;
+    start plus -> recurse g right;
+
+    recurse _ -> end g left; -- This ends the recursion
+    recurse 0 -> finish c reverse; 
+    recurse 1 -> finish c reverse;
+    recurse plus -> finish c reverse;
+
+    finish _ -> end g left; -- Should never happen
+    finish 0 -> call_append g left;
+    finish 1 -> call_append g left;
+    finish plus -> call_append g left;
+
+    call_append _ -> end c append;
+    call_append 0 -> end c append;
+    call_append 1 -> end c append;
+    call_append plus -> end c append;
+  }
+}
+
+machine shift_left = {
+  -- Visually the algorithm does this:
+  -- [_] b b b
+  -- [b] b b _
+  -- For empty lists it will do nothing
+  -- [_] _ 
+  -- [_] _
+  -- Any character you had stored in header will be lost!
+  -- [a] b b b
+  -- [b] b b _
+  -- Even if the list is empty
+  -- [a] _
+  -- [_] _
+  -- This is intentional, so that you can tell the list you shifted was empty
+
+  states = {start, swapped, recurse, finish, end}
+  init_state = {start}
+  halting_states = {end}
+  function = {
+    start _ -> swapped c swap;
+    start 0 -> start w _;
+    start 1 -> start w _;
+    start plus -> start w _;
+
+    swapped _ -> end w _; -- This ends the recursion
+    swapped 0 -> recurse g right;
+    swapped 1 -> recurse g right;
+    swapped plus -> recurse g right;
+
+    recurse _ -> finish c shift_left;
+    recurse 0 -> recurse w _; -- Should never happen
+    recurse 1 -> recurse w _; -- Should never happen
+    recurse plus -> recurse w _; -- Should never happen
+
+    finish _ -> end g left;
+    finish 0 -> end g left;
+    finish 1 -> end g left;
+    finish plus -> end g left;
+  }
+}
+
+machine shift_right = {
+    -- Visually the algorithm does this:
+    -- [a] a a a a _
+    -- [_] a a a a a _ 
+    -- Careful though it only sees the block at the right, blanks can seperate blocks
+    -- [a] a a a a _ b b b _
+    -- [_] a a a a a b b b _
+    -- Can work even if the first element is blank followed by a block:
+    -- [_] a a a a _
+    -- [_] _ a a a a _
+    
+    states = {start, recurse, finish, call_swap, end}
+    init_state = {start}
+    halting_states = {end}
+    function = {
+        start _ -> recurse g right;
+        start 0 -> recurse g right;
+        start 1 -> recurse g right;
+        start plus -> recurse g right;
+
+        recurse _ -> call_swap g left; -- The recursion ends here
+        recurse 0 -> finish c shift_right;
+        recurse 1 -> finish c shift_right;
+        recurse plus -> finish c shift_right;
+
+        finish _ -> call_swap g left;
+        finish 0 -> finish w _; -- Should never happen
+        finish 1 -> finish w _; -- Should never happen
+        finish plus -> finish w _; -- Should never happen
+
+        call_swap _ -> end c swap;
+        call_swap 0 -> end c swap;
+        call_swap 1 -> end c swap;
+        call_swap plus -> end c swap;
+    }
+}
+
+machine zip = {
+    -- This machine here does a lot of heavy lifting, the problem with turing machines is
+    -- I have no memory, but I will need to add bits one by one and remember a carry. Instead
+    -- of having to go back and forth and remember the information of which bit I read from one
+    -- number and what from another, I decided to perform a zip of the two so I pair up their
+    -- bits in the tape, this will also handle difference in number of bits by using zeroes, and
+    -- my adder later can process them in order one pair at a time easier. Keep in mind that this
+    -- simple does a zip, the adder will have to reverse so he processes the bits from lowest to 
+    -- highest because right now the highest bits are put at the start and lowest at the end
+    -- Visually the algorithm does this:
+    -- [_] 1 0 1 0 plus 1 0
+    -- [_] 1 0 0 0 1 1 0 0 
+    -- Other input may be:
+    -- [_] plus 1 0
+    -- [_] 1 0 0 0 
+    -- Other input may be:
+    -- [_] 1 0 plus 
+    -- [_] 1 0 0 0
+    -- other input may be:
+    -- [_] 1 plus 0 1 0 1 0
+    -- [_] 0 0 0 1 0 0 0 1 1 0
+    -- Other input may be:
+    -- [_] plus
+    -- [_]
+    -- My normalize_number should then handle
+
+    states = {start, scan_right, go_right, main_loop, inserted_new_pair, next_pair, try_to_zip, fix_second_blank_bug,
+            add_zero, finish, made_space, made_more_space, bring_pair, found_plus, insert_0, return_right, return_left, end}
+    init_state = {start}
+    halting_states = {end}
+    function = {
+        start _ -> scan_right g right;
+        start 0 -> start w _;
+        start 1 -> start w _;
+        start plus -> start w _;
+
+        scan_right _ -> return_left g left; -- No plus seperator was found
+        scan_right 0 -> scan_right g right;
+        scan_right 1 -> scan_right g right;
+        scan_right plus -> go_right g right;
+ 
+        go_right _ -> main_loop g left;
+        go_right 0 -> go_right g right;
+        go_right 1 -> go_right g right;
+        go_right plus -> return_left g left; -- We can only zip two lists not three
+
+        main_loop _ -> inserted_new_pair c shift_left; -- Can happen when we returned after inserting
+        main_loop 0 -> made_space c shift_right;
+        main_loop 1 -> made_space c shift_right;
+        main_loop plus -> try_to_zip c left_swap;
+
+        inserted_new_pair _ -> return_left g left; -- Should never happen
+        inserted_new_pair 0 -> next_pair g left;
+        inserted_new_pair 1 -> next_pair g left;
+        inserted_new_pair plus -> return_left g left; -- Should never happen
+
+        next_pair _ -> return_left g left; -- Should never happen
+        next_pair 0 -> main_loop g left;
+        next_pair 1 -> main_loop g left;
+        next_pair plus -> main_loop w plus; -- Should never happen
+        
+        try_to_zip _ -> finish c left_swap; -- The left list was empty
+        try_to_zip 0 -> add_zero c shift_right;
+        try_to_zip 1 -> add_zero c shift_right;
+        try_to_zip plus -> try_to_zip w _; -- Should never happen
+
+        add_zero _ -> add_zero w 0;
+        add_zero 0 -> main_loop g left;
+        add_zero 1 -> add_zero w 0; -- Should never happen
+        add_zero plus -> add_zero w 0; -- Should never happen
+
+        finish _ -> end w _;
+        finish 0 -> finish g left;
+        finish 1 -> finish g left;
+        finish plus -> finish c shift_left;
+
+        made_space _ -> made_more_space c shift_right;
+        made_space 0 -> made_space w _; -- Should never happen;
+        made_space 1 -> made_space w _; -- Should never happen;
+        made_space plus -> made_space w _; -- Should never happen;
+
+        -- I needed more space so we can figure out how to return back
+        -- a the space we were after we do the insertion later
+        made_more_space _ -> bring_pair g left;
+        made_more_space 0 -> made_more_space w _; -- Should never happen
+        made_more_space 1 -> made_more_space w _; -- Should never happen
+        made_more_space plus -> made_more_space w _; -- Should never happen
+
+        bring_pair _ -> bring_pair w plus; -- Should never happen
+        bring_pair 0 -> bring_pair g left;
+        bring_pair 1 -> bring_pair g left;
+        bring_pair plus -> found_plus g left;
+
+        found_plus _ -> insert_0 g right;
+        found_plus 0 -> return_right c append;
+        found_plus 1 -> return_right c append;
+        found_plus plus -> found_plus w _; -- Should never happen
+
+        insert_0 _ -> insert_0 w 0;
+        insert_0 0 -> return_right c append;
+        insert_0 1 -> insert_0 w 0; -- Should never happen
+        insert_0 plus -> insert_0 c shift_right;
+
+        return_right _ -> fix_second_blank_bug g right; -- A bug I discovered, append has created a second blank I wasnt taking account of before
+        return_right 0 -> return_right g right;
+        return_right 1 -> return_right g right;
+        return_right plus -> return_right g right;
+
+        fix_second_blank_bug _ -> fix_second_blank_bug c shift_left;
+        fix_second_blank_bug 0 -> main_loop g left;
+        fix_second_blank_bug 1 -> main_loop g left;
+        fix_second_blank_bug plus -> main_loop g left; -- Shouldnt happen
+
+        return_left _ -> end w _;
+        return_left 0 -> return_left g left;
+        return_left 1 -> return_left g left;
+        return_left plus -> return_left g left;
+    }
+}
+
+
+machine sum_bits = {
+    -- Input will be of he form
+    -- [_] Cin A B x x
+    -- output will be:
+    -- [Sum] Cout x x
+    -- Cin, A and B can be blank, and they will be treated as 0
+    -- For example:
+    -- [_] _ _ _
+    -- [0] _
+    -- Or another example:
+    -- [_] Cin _ _ x x
+    -- [Cin] x x
+
+    -- A B Cin   Sum  Cout
+    -- 0 0 0      0    0
+    -- 0 0 1      1    0
+    -- 0 1 0      1    0
+    -- 0 1 1      0    1
+    -- 1 0 0      1    0
+    -- 1 0 1      0    1
+    -- 1 1 0      0    1
+    -- 1 1 1      1    1
+    --
+
+    states = {start, read_cin, exit, end,
+            0_x_x, 1_x_x,
+            0_0_x, 0_1_x, 1_0_x, 1_1_x,
+            0_0_0, 0_0_1, 0_1_0, 0_1_1, 1_0_0, 1_0_1, 1_1_0, 1_1_1,
+            0_0_0_carry, 0_0_1_carry, 0_1_0_carry, 0_1_1_carry, 1_0_0_carry, 1_0_1_carry, 1_1_0_carry, 1_1_1_carry,
+            0_0_0_sum, 0_0_1_sum, 0_1_0_sum, 0_1_1_sum, 1_0_0_sum, 1_0_1_sum, 1_1_0_sum, 1_1_1_sum}
+    init_state = {start}
+    halting_states = {end}
+    function = {
+        start _ -> read_cin g right;
+        start 0 -> start w _;
+        start 1 -> start w _;
+        start plus -> start w _;
+
+        read_cin _ -> 0_x_x g right; -- Treat blank as zero
+        read_cin 0 -> 0_x_x g right;
+        read_cin 1 -> 1_x_x g right;
+        read_cin plus -> exit g left; -- Shouldnt happen
+
+        0_x_x _ -> 0_0_x c shift_left; -- Treat blank as 0
+        0_x_x 0 -> 0_0_x c shift_left;
+        0_x_x 1 -> 0_1_x c shift_left;
+        0_x_x plus -> exit g left; -- Shouldnt happen
+
+        0_0_x _ -> 0_0_0 c shift_left; -- Treat blank as 0
+        0_0_x 0 -> 0_0_0 c shift_left; 
+        0_0_x 1 -> 0_0_1 c shift_left;
+        0_0_x plus -> exit g left; -- Shouldnt happen
+
+        0_1_x _ -> 0_1_0 c shift_left; -- Treat blank as 0
+        0_1_x 0 -> 0_1_0 c shift_left;
+        0_1_x 1 -> 0_1_1 c shift_left;
+        0_1_x plus -> exit g left; -- Shouldnt happen
+
+        1_x_x _ -> 1_0_x c shift_left; -- Treat blank as 0
+        1_x_x 0 -> 1_0_x c shift_left;
+        1_x_x 1 -> 1_1_x c shift_left;
+        1_x_x plus -> exit g left; -- Shouldnt happen
+
+        1_0_x _ -> 1_0_0 c shift_left; -- Treat blank as 0
+        1_0_x 0 -> 1_0_0 c shift_left; 
+        1_0_x 1 -> 1_0_1 c shift_left;
+        1_0_x plus -> exit g left; -- Shouldnt happen
+
+        1_1_x _ -> 1_1_0 c shift_left; -- Treat blank as 0
+        1_1_x 0 -> 1_1_0 c shift_left;
+        1_1_x 1 -> 1_1_1 c shift_left;
+        1_1_x plus -> exit g left; -- Shouldnt happen
+
+        0_0_0 _ -> 0_0_0_carry g left;
+        0_0_0 0 -> 0_0_0_carry g left;
+        0_0_0 1 -> 0_0_0_carry g left;
+        0_0_0 plus -> 0_0_0_carry g left; -- Should never happen
+
+        0_0_1 _ -> 0_0_1_carry g left;
+        0_0_1 0 -> 0_0_1_carry g left;
+        0_0_1 1 -> 0_0_1_carry g left;
+        0_0_1 plus -> 0_0_1_carry g left; -- Should never happen
+
+        0_1_0 _ -> 0_1_0_carry g left;
+        0_1_0 0 -> 0_1_0_carry g left;
+        0_1_0 1 -> 0_1_0_carry g left;
+        0_1_0 plus -> 0_1_0_carry g left; -- Should never happen
+
+        0_1_1 _ -> 0_1_1_carry g left;
+        0_1_1 0 -> 0_1_1_carry g left;
+        0_1_1 1 -> 0_1_1_carry g left;
+        0_1_1 plus -> 0_1_1_carry g left; -- Should never happen
+
+        1_0_0 _ -> 1_0_0_carry g left;
+        1_0_0 0 -> 1_0_0_carry g left;
+        1_0_0 1 -> 1_0_0_carry g left;
+        1_0_0 plus -> 1_0_0_carry g left; -- Should never happen
+
+        1_0_1 _ -> 1_0_1_carry g left;
+        1_0_1 0 -> 1_0_1_carry g left;
+        1_0_1 1 -> 1_0_1_carry g left;
+        1_0_1 plus -> 1_0_1_carry g left; -- Should never happen
+
+        1_1_0 _ -> 1_1_0_carry g left;
+        1_1_0 0 -> 1_1_0_carry g left;
+        1_1_0 1 -> 1_1_0_carry g left;
+        1_1_0 plus -> 1_1_0_carry g left; -- Should never happen
+
+        1_1_1 _ -> 1_1_1_carry g left;
+        1_1_1 0 -> 1_1_1_carry g left;
+        1_1_1 1 -> 1_1_1_carry g left;
+        1_1_1 plus -> 1_1_1_carry g left; -- Should never happen
+
+        0_0_0_carry _ -> 0_0_0_carry w 0;
+        0_0_0_carry 0 -> 0_0_0_sum g left;
+        0_0_0_carry 1 -> 0_0_0_carry w 0;
+        0_0_0_carry plus -> 0_0_0_carry w 0;
+
+        0_0_1_carry _ -> 0_0_1_carry w 0;
+        0_0_1_carry 0 -> 0_0_1_sum g left;
+        0_0_1_carry 1 -> 0_0_1_carry w 0;
+        0_0_1_carry plus -> 0_0_1_carry w 0;
+
+        0_1_0_carry _ -> 0_1_0_carry w 0;
+        0_1_0_carry 0 -> 0_1_0_sum g left;
+        0_1_0_carry 1 -> 0_1_0_carry w 0;
+        0_1_0_carry plus -> 0_1_0_carry w 0;
+
+        0_1_1_carry _ -> 0_1_1_carry w 1;
+        0_1_1_carry 0 -> 0_1_1_carry w 1;
+        0_1_1_carry 1 -> 0_1_1_sum g left;
+        0_1_1_carry plus -> 0_1_1_carry w 1;
+
+        1_0_0_carry _ -> 1_0_0_carry w 0;
+        1_0_0_carry 0 -> 1_0_0_sum g left;
+        1_0_0_carry 1 -> 1_0_0_carry w 0;
+        1_0_0_carry plus -> 1_0_0_carry w 0;
+
+        1_0_1_carry _ -> 1_0_1_carry w 1;
+        1_0_1_carry 0 -> 1_0_1_carry w 1;
+        1_0_1_carry 1 -> 1_0_1_sum g left;
+        1_0_1_carry plus -> 1_0_1_carry w 1;
+
+        1_1_0_carry _ -> 1_1_0_carry w 1;
+        1_1_0_carry 0 -> 1_1_0_carry w 1;
+        1_1_0_carry 1 -> 1_1_0_sum g left;
+        1_1_0_carry plus -> 1_1_0_carry w 1;
+
+        1_1_1_carry _ -> 1_1_1_carry w 1;
+        1_1_1_carry 0 -> 1_1_1_carry w 1;
+        1_1_1_carry 1 -> 1_1_1_sum g left;
+        1_1_1_carry plus -> 1_1_1_carry w 1;
+
+        0_0_0_sum _ -> 0_0_0_sum w 0;
+        0_0_0_sum 0 -> end w 0;
+        0_0_0_sum 1 -> 0_0_0_sum w 0;
+        0_0_0_sum plus -> 0_0_0_sum w 0;
+
+        0_0_1_sum _ -> 0_0_1_sum w 1;
+        0_0_1_sum 0 -> 0_0_1_sum w 1;
+        0_0_1_sum 1 -> end w 1;
+        0_0_1_sum plus -> 0_0_1_sum w 1;
+
+        0_1_0_sum _ -> 0_1_0_sum w 1;
+        0_1_0_sum 0 -> 0_1_0_sum w 1;
+        0_1_0_sum 1 -> end w 1;
+        0_1_0_sum plus -> 0_1_0_sum w 1;
+
+        0_1_1_sum _ -> 0_1_1_sum w 0;
+        0_1_1_sum 0 -> end w 0;
+        0_1_1_sum 1 -> 0_1_1_sum w 0;
+        0_1_1_sum plus -> 0_1_1_sum w 0;
+
+        1_0_0_sum _ -> 1_0_0_sum w 1;
+        1_0_0_sum 0 -> 1_0_0_sum w 1;
+        1_0_0_sum 1 -> end w 1;
+        1_0_0_sum plus -> 1_0_0_sum w 1;
+
+        1_0_1_sum _ -> 1_0_1_sum w 0;
+        1_0_1_sum 0 -> end w 0;
+        1_0_1_sum 1 -> 1_0_1_sum w 0;
+        1_0_1_sum plus -> 1_0_1_sum w 0;
+
+        1_1_0_sum _ -> 1_1_0_sum w 0;
+        1_1_0_sum 0 -> end w 0;
+        1_1_0_sum 1 -> 1_1_0_sum w 0;
+        1_1_0_sum plus -> 1_1_0_sum w 0;
+
+        1_1_1_sum _ -> 1_1_1_sum w 1;
+        1_1_1_sum 0 -> 1_1_1_sum w 1;
+        1_1_1_sum 1 -> end w 1;
+        1_1_1_sum plus -> 1_1_1_sum w 1;
+
+        exit _ -> end w _;
+        exit 0 -> exit g left;
+        exit 1 -> exit g left;
+        exit plus -> exit g left;
+    }
+}
+
+machine normalize_number = {
+    -- Takes input:
+    -- [_] 0 0 0 1
+    -- Returns:
+    -- [_] 1
+    -- Can also do this:
+    -- [_] 0 0 0
+    -- [_] 0
+    -- Or this:
+    -- [_] _
+    -- [_] 0
+    -- Yea I treat blank as zero here so that if you typed just "plus" the adder would print 0 instead of a blank tape
+
+    states = {start, remove_zeroes, go_left, end}
+    init_state = {start}
+    halting_states = {end}
+    function = {
+        start _ -> remove_zeroes g right;
+        start 0 -> start w _;
+        start 1 -> start w _;
+        start plus -> start w _;
+
+        remove_zeroes _ -> go_left w 0;
+        remove_zeroes 0 -> remove_zeroes c shift_left;
+        remove_zeroes 1 -> go_left w 1;
+        remove_zeroes plus -> go_left w plus;
+
+        go_left _ -> end w _;
+        go_left 0 -> go_left g left;
+        go_left 1 -> go_left g left;
+        go_left plus -> go_left g left;
+    }
+}
+
+machine adder = {
+    -- Finally ready to create our adder :D, took lot of effort to get here, 638 lines of code
+    -- Takes input of the form:
+    -- [_] 1 0 1 plus 1 0 1 0 plus 1 0 0 1 ....
+    -- Returns the result:
+    -- [_] 1 1 1 1 ...
+    -- Notice how, we allow as many plus as you want to be chained, this is a powerful adder, we arent playing here
+    -- For the recursion to work, we also allow input:
+    -- [_] 1 0 1
+    -- [_] 1 0 1
+    -- Meaning, if you have a single number without plus nothing happens, but also this would work if you did this by accident:
+    -- [_] 1 0 1 plus
+    -- [_] 1 0 1
+    -- Because our cool zipper can zip a list with an empty list by pairing the bits with zeroes
+    -- I will also allow you to be able to do stuff like this:
+    -- [_] 1 0 1 plus plus 1 0
+    -- [_] 1 1 1 
+    -- Add as many plus as you want, this wont break my program >:p
+    -- I even let you do stuff like this:
+    -- [_] plus 1 0 1
+    -- [_] 1 0 1
+    -- So for real, there is no input you can give me that will not work
+
+    states = {start, find_plus, return_left, recurse, combine, final_add, 
+              add_preprocess, add_preprocess2, add_preprocess3, add_preprocess4,
+              do_addition, added_a_bit, check_if_done, check_if_done2, add_reverse_preprocess,
+              is_done, finish, end}
+    init_state = {start}
+    halting_states = {end}
+    function = {
+        start _ -> find_plus g right;
+        start 0 -> start w _;
+        start 1 -> start w _;
+        start plus -> start w _;
+
+        find_plus _ -> return_left g left; -- Recursion ends here
+        find_plus 0 -> find_plus g right;
+        find_plus 1 -> find_plus g right;
+        find_plus plus -> recurse w _;
+
+        return_left _ -> end w _;
+        return_left 0 -> return_left g left;
+        return_left 1 -> return_left g left;
+        return_left plus -> return_left g left;
+
+        recurse _ -> combine c adder; -- After we have the result of the recursion we combine
+        recurse 0 -> recurse w _; -- Should never happen
+        recurse 1 -> recurse w _; -- Should never happen
+        recurse plus -> recurse w _; -- Should never happen
+
+        combine _ -> combine w plus;
+        combine 0 -> combine w plus; -- Should never happen
+        combine 1 -> combine w plus; -- Should never happen
+        combine plus -> final_add g left;
+
+        final_add _ -> add_preprocess w _;
+        final_add 0 -> final_add g left;
+        final_add 1 -> final_add g left;
+        final_add plus -> final_add g left; -- Should never happen
+
+        add_preprocess _ -> add_reverse_preprocess c zip;
+        add_preprocess 0 -> add_preprocess w _; -- Should never happen
+        add_preprocess 1 -> add_preprocess w _; -- Should never happen
+        add_preprocess plus -> add_preprocess w _; -- Should never happen
+
+        -- Had forgotten to add this before so I added it now thats why its not called preprocess2
+        add_reverse_preprocess _ -> add_reverse_preprocess c reverse;
+        add_reverse_preprocess 0 -> add_preprocess2 c shift_right;
+        add_reverse_preprocess 1 -> add_preprocess2 c shift_right;
+        add_reverse_preprocess plus -> add_preprocess2 c shift_right; -- Should never happen
+
+        add_preprocess2 _ -> add_preprocess3 c shift_right;
+        add_preprocess2 0 -> add_preprocess2 w _; -- Should never happen
+        add_preprocess2 1 -> add_preprocess2 w _; -- Should never happen
+        add_preprocess2 plus -> add_preprocess2 w _; -- Should never happen
+
+        add_preprocess3 _ -> add_preprocess4 g right;
+        add_preprocess3 0 -> add_preprocess3 w _; -- Should never happen
+        add_preprocess3 1 -> add_preprocess3 w _; -- Should never happen
+        add_preprocess3 plus -> add_preprocess3 w _; -- Should never happens
+
+        add_preprocess4 _ -> add_preprocess4 w 0; -- Writing Cin
+        add_preprocess4 0 -> do_addition c shift_right; -- Make space for the result
+        add_preprocess4 1 -> do_addition c shift_right; -- Make space for the result
+        add_preprocess4 plus -> add_preprocess4 w 0; -- Should never happen
+
+        do_addition _ -> added_a_bit c sum_bits;
+        do_addition 0 -> do_addition w 0; -- Should never happen
+        do_addition 1 -> do_addition w 0; -- Should never happen
+        do_addition plus -> do_addition w 0; -- Should never happen
+
+        added_a_bit _ -> check_if_done g right; -- Should never happen
+        added_a_bit 0 -> check_if_done g right;
+        added_a_bit 1 -> check_if_done g right;
+        added_a_bit plus -> check_if_done g right; -- Should never happen
+
+        check_if_done _ -> check_if_done2 g right; -- Should never happen
+        check_if_done 0 -> check_if_done2 g right;
+        check_if_done 1 -> check_if_done2 g right;
+        check_if_done plus -> check_if_done2 g right; -- Should never happen
+
+        check_if_done2 _ -> is_done g left;
+        check_if_done2 0 -> add_preprocess4 g left;
+        check_if_done2 1 -> add_preprocess4  g left;
+        check_if_done2 plus -> check_if_done2 w _; -- Should never happen
+
+        is_done _ -> finish c reverse; -- A final reverse to print the result correctly
+        is_done 0 -> is_done g left;
+        is_done 1 -> is_done g left;
+        is_done plus -> is_done g left; -- Should never happen    
+
+        finish _ -> end c normalize_number; -- Not necessary but makes this prettier
+        finish 0 -> finish c shift_right; -- This is because reverse has brought the result on the start
+        finish 1 -> finish c shift_right; -- however we want the end tape to be [_] result, important for recursion
+        finish plus -> finish w _; -- Should never happen;
+    }
+}
+
+-- I hope the thing above works my head hurts a bit but I believe in it, lets finish this now...
+
+machine start = {
+    states = {start, success}
+    init_state = {start}
+    halting_states = {success}
+    function = {
+        start _ -> success c adder;
+        start 0 -> start w _; -- Shouldnt happen
+        start 1 -> start w _; -- Shouldnt happen
+        start plus -> start w _; -- Shouldnt happen
+    }
+}
+

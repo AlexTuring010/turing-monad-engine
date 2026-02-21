@@ -207,12 +207,12 @@ parseInitStateSection machineName states ("init_state":"=":"{":name:"}":rest) =
 parseInitStateSection machineName _ _ = Left ("Error: Expected 'init_state = { <state> }' in machine '" ++ machineName ++ "'")
 
 parseHaltingStatesSection :: String -> [String] -> [String] -> ParseResult ([String], [String])
-parseHaltingStatesSection machineName states ("halting_states":"=":"{":rest) =
+parseHaltingStatesSection machineName states ("halting_states":"=":"{": rest) =
     do
         (haltStates, restAfterHalting) <- parseHaltingStateList machineName rest
         if validateStatesExist states haltStates
             then Right (haltStates, restAfterHalting)
-            else Left ("Error: Unknown halting state in machine '" ++ machineName ++ "'")
+        else Left ("Error: Unknown halting state in machine '" ++ machineName ++ "'")
 parseHaltingStatesSection machineName _ _ = Left ("Error: Expected 'halting_states = { ... }' in machine '" ++ machineName ++ "'")
 
 parseStateList :: String -> [String] -> ParseResult ([String], [String])
@@ -233,7 +233,7 @@ parseStateListTail machineName acc stateMap (",": name:more)
 parseStateListTail machineName _ _ _ = Left ("Error: Invalid state list in machine '" ++ machineName ++ "' (expected names separated by commas, ending with '}')")
 
 parseHaltingStateList :: String -> [String] -> ParseResult ([String], [String])
-parseHaltingStateList _ ("}":rest) = Right ([], rest)
+parseHaltingStateList machineName ("}": _) = Left ("Error: Halting state list cannot be empty in machine '" ++ machineName ++ "'")
 parseHaltingStateList machineName (name:rest)
     | not (isNameToken name) = Left ("Error: Invalid state name '" ++ name ++ "' in machine '" ++ machineName ++ "'")
     | otherwise = parseHaltingStateListTail machineName [name] rest
@@ -244,7 +244,7 @@ parseHaltingStateListTail _ acc ("}": rest) = Right (reverse acc, rest)
 parseHaltingStateListTail machineName acc (",": name:more)
     | not (isNameToken name) = Left ("Error: Invalid state name '" ++ name ++ "' in machine '" ++ machineName ++ "'")
     | otherwise = parseHaltingStateListTail machineName (name:acc) more
-parseHaltingStateListTail machineName _ _ = Left ("Error: Invalid state list in machine '" ++ machineName ++ "' (expected names separated by commas, ending with '}')"
+parseHaltingStateListTail machineName _ _ = Left ("Error: Invalid state list in machine '" ++ machineName ++ "' (expected names separated by commas, ending with '}')")
 
 
 {-------------------------------------------------------------------------------------
@@ -356,6 +356,8 @@ parseProgram tokens = do
 testParser :: FilePath -> IO ()
 testParser filePath = do
     input <- readFile filePath
-    case parseProgram input of
-        Left err -> putStrLn ("Failed: " ++ err)
-        Right res -> putStrLn ("Success! Program parsed: " ++ show res)
+    case tokenize input of
+        Left err -> putStrLn ("Tokenize failed: " ++ err)
+        Right tokens -> case parseProgram tokens of
+            Left err -> putStrLn ("Parse failed: " ++ err)
+            Right res -> putStrLn ("Success! Program parsed: " ++ show res)

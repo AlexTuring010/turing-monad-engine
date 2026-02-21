@@ -1,0 +1,223 @@
+alphabet = {a, b, c}
+
+machine swap = {
+  -- Visually the algorithm does this:
+  -- [a] b
+  -- [b] a
+  -- Can work with blanks too:
+  -- [_] b
+  -- [b] _
+  
+  states = {start, 
+          from_blank, from_a, from_b, from_c, 
+          blank_to_a, blank_to_b, blank_to_c, 
+          a_to_blank, a_to_b, a_to_c, 
+          b_to_blank, b_to_a, b_to_c, 
+          c_to_blank, c_to_a, c_to_b, 
+          write_blank, write_a, write_b, write_c, end}
+  init_state = {start}
+  halting_states = {end}
+  function = {
+    start _ -> from_blank g right;
+    start a -> from_a g right;
+    start b -> from_b g right;
+    start c -> from_c g right;
+
+    -- From blank chain:
+
+    from_blank _ -> end g left;
+    from_blank a -> blank_to_a w _;
+    from_blank b -> blank_to_b w _;
+    from_blank c -> blank_to_c w _;
+
+    blank_to_a _ -> write_a g left;
+    blank_to_a a -> blank_to_a w _; -- Should never happen
+    blank_to_a b -> blank_to_b w _; -- Should never happen
+    blank_to_a c -> blank_to_c w _; -- Should never happen
+
+    blank_to_b _ -> write_b g left;
+    blank_to_b a -> blank_to_a w _; -- Should never happen
+    blank_to_b b -> blank_to_b w _; -- Should never happen
+    blank_to_b c -> blank_to_c w _; -- Should never happen
+
+    blank_to_c _ -> write_c g left;
+    blank_to_c a -> blank_to_a w _; -- Should never happen
+    blank_to_c b -> blank_to_b w _; -- Should never happen
+    blank_to_c c -> blank_to_c w _; -- Should never happen
+
+    -- From a chain:
+  
+    from_a _ -> a_to_blank w a;
+    from_a a -> end g left;
+    from_a b -> a_to_b w a;
+    from_a c -> a_to_c w a;
+
+    a_to_blank a -> write_blank g left;
+    a_to_blank _ -> a_to_blank w a; -- Should never happen
+    a_to_blank b -> a_to_b w a; -- Should never happen
+    a_to_blank c -> a_to_c w a; -- Should never happen
+
+    a_to_b a -> write_b g left;
+    a_to_b _ -> a_to_blank w a; -- Should never happen
+    a_to_b b -> a_to_b w a; -- Should never happen
+    a_to_b c -> a_to_c w a; -- Should never happen
+
+    a_to_c a -> write_c g left;
+    a_to_c _ -> a_to_blank w a; -- Should never happen
+    a_to_c b -> a_to_b w a; -- Should never happen
+    a_to_c c -> a_to_c w a; -- Should never happen
+
+    -- From b chain:
+
+    from_b _ -> b_to_blank w b;
+    from_b a -> b_to_a w b;
+    from_b b -> end g left;
+    from_b c -> b_to_c w b;
+
+    b_to_blank b -> write_blank g left;
+    b_to_blank _ -> b_to_blank w b; -- Should never happen
+    b_to_blank a -> b_to_a w b; -- Should never happen
+    b_to_blank c -> b_to_c w b; -- Should never happen
+
+    b_to_a b -> write_a g left;
+    b_to_a _ -> b_to_blank w b; -- Should never happen
+    b_to_a a -> b_to_a w b; -- Should never happen
+    b_to_a c -> b_to_c w b; -- Should never happen
+
+    b_to_c b -> write_c g left;
+    b_to_c _ -> b_to_blank w b; -- Should never happen
+    b_to_c a -> b_to_a w b; -- Should never happen
+    b_to_c c -> b_to_c w b; -- Should never happen
+
+    -- From c chain:
+
+    from_c _ -> c_to_blank w c;
+    from_c a -> c_to_a w c;
+    from_c b -> c_to_b w c;
+    from_c c -> end g left;
+
+    c_to_blank c -> write_blank g left;
+    c_to_blank _ -> c_to_blank w c; -- Should never happen
+    c_to_blank a -> c_to_a w c; -- Should never happen
+    c_to_blank b -> c_to_b w c; -- Should never happen
+
+    c_to_a c -> write_a g left;
+    c_to_a _ -> c_to_blank w c; -- Should never happen
+    c_to_a a -> c_to_a w c; -- Should never happen
+    c_to_a b -> c_to_b w c; -- Should never happen
+
+    c_to_b c -> write_b g left;
+    c_to_b _ -> c_to_blank w c; -- Should never happen
+    c_to_b a -> c_to_a w c; -- Should never happen
+    c_to_b b -> c_to_b w c; -- Should never happen
+
+    -- The finish states 
+
+    write_blank _ -> end w _;
+    write_blank a -> end w _;
+    write_blank b -> end w _;
+    write_blank c -> end w _;
+
+    write_a _ -> end w a;
+    write_a a -> end w a;
+    write_a b -> end w a;
+    write_a c -> end w a;
+
+    write_b _ -> end w b;
+    write_b a -> end w b;
+    write_b b -> end w b;
+    write_b c -> end w b;
+
+    write_c _ -> end w c;
+    write_c a -> end w c;
+    write_c b -> end w c;
+    write_c c -> end w c;
+  }
+}
+
+machine append = {
+  -- Visually the algorithm does this:
+  -- [a] b b b b b b b b b a _
+  -- [b] b b b b b b b b a a _
+  -- Can work on empty lists like this:
+  -- [a] _
+  -- [a] _
+  -- Inserting an _ is basically just shift_left
+  -- [_] b b b b b b b b b a
+  -- [b] b b b b b b b b a
+
+  states = {start, swapped, recurse, finish, end}
+  init_state = {start}
+  halting_states = {end}
+  function = {
+    start _ -> swapped c swap;
+    start a -> swapped c swap;
+    start b -> swapped c swap;
+    start c -> swapped c swap;
+
+    swapped _ -> end c swap; -- The recursion ends here
+    swapped a -> recurse g right;
+    swapped b -> recurse g right;
+    swapped c -> recurse g right;
+
+    recurse _ -> finish c append;
+    recurse a -> finish c append;
+    recurse b -> finish c append;
+    recurse c -> finish c append;
+
+    finish _ -> end g left;
+    finish a -> end g left;
+    finish b -> end g left;
+    finish c -> end g left;
+  }
+}
+
+machine reverse = {
+  -- Visually the algorithm does this:
+  -- [a] b c b c _
+  -- [c] b c b a _
+  -- It is reversing the list, by convention your header should be pointing to the start
+  -- of the list, at the end the pointer will be at the same place it was when called only
+  -- the items will have been moved
+  -- Of course this would also work though:
+  -- [_] a b c b c _
+  -- [c] b c b a _
+  -- Since the blank will be put at the end. Both will do the same thing
+
+  states = {start, recurse, finish, call_append, end}
+  init_state = {start}
+  halting_states = {end}
+  function = {
+    start _ -> recurse g right;
+    start a -> recurse g right;
+    start b -> recurse g right;
+    start c -> recurse g right;
+
+    recurse _ -> end g left; -- This ends the recursion
+    recurse a -> finish c reverse; 
+    recurse b -> finish c reverse;
+    recurse c -> finish c reverse;
+
+    finish _ -> end g left; -- Should never happen
+    finish a -> call_append g left;
+    finish b -> call_append g left;
+    finish c -> call_append g left;
+
+    call_append _ -> end c append;
+    call_append a -> end c append;
+    call_append b -> end c append;
+    call_append c -> end c append;
+  }
+}
+
+machine start = {
+  states = {start, end}
+  init_state = {start}
+  halting_states = {end}
+  function = {
+    start _ -> end c reverse;
+    start a -> end c reverse;
+    start b -> end c reverse;
+    start c -> end c reverse;
+  }
+}
