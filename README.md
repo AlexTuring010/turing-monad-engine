@@ -1,82 +1,69 @@
-# Turing Machine Emulator
+# turing-monad-engine
 
-**Όνομα:** Αλεξανδρος Γκιάφης  
-**ΑΜ:** sdi2200284
+A Haskell interpreter for **Recursive Turing Machines (rTM)** — an
+extension of the classic Turing machine model where machines can call
+other machines recursively. Built as an undergraduate
+theory-of-computation project.
 
-## Πώς να το τρέξεις
+## What it does
 
-Πρώτα compile με:
+Reads a `.turing` source file, parses it (with semantic checks), and
+executes the program against an input tape. Supports:
+
+- Recursive machine calls (the "monad-engine" in the name)
+- Multi-machine programs with a designated start machine
+- Inline `-- comments` in source files
+- Two example programs: `programs/reverse.turing` and
+  `programs/addition.turing`
+
+## Architecture
+
+| File | Responsibility |
+|---|---|
+| `Main.hs` | I/O, CLI args, initial tape from user |
+| `Tokenizer.hs` | Lexer — tokens, comment stripping |
+| `Parser.hs` | Builds the AST and runs semantic analysis (completeness, undefined references, duplicates, missing start machine) |
+| `Emulator.hs` | Executes the parsed program — runs without re-checking, since the parser already validated |
+| `Types.hs` | Core data types |
+| `Map.hs` | Custom AVL-tree map (`O(log n)` lookup) for machines, states, and transitions |
+
+I implemented the map as a balanced AVL tree rather than reusing
+`Data.Map`, partly as an exercise. The tape is a **dual-list** structure
+(reversed-left-half + right-half with the head between them), making
+head moves `O(1)`.
+
+## Example: binary addition (the interesting one)
+
+`programs/addition.turing` adds binary numbers given input like
+`1 0 1 plus 1 0 plus 1`. The strategy is recursive: replace the first
+`plus` with a blank, recurse to add the remaining numbers, then fold
+that result back together with the original first number.
+
+The zip step is the most interesting machine. It pairs bits of two
+numbers, padding the shorter with zeros so addition can proceed on
+aligned pairs (LSB-first). It handles `_ plus 1 1`, `_ 1 1 plus _`, and
+arbitrarily mismatched bit lengths.
+
+Test cases that all pass:
+
+| Input | Output |
+|---|---|
+| `plus plus plus` | `0` |
+| `1 plus plus plus 1 plus` | `10` |
+| `0 plus 0 plus 0 plus 0` | `0` |
+| `1 0 1 plus 1 0 plus 1 plus` | `1000` |
+| `plus 1 plus 0 plus 1 plus plus` | `10` |
+
+## Build and run
+
 ```bash
 ghc --make Main.hs -o rTM -outputdir build
-```
-
-Μετά μπορείς να δοκιμάσεις ένα αρχείο:
-```bash
 ./rTM programs/reverse.turing
+./rTM programs/addition.turing
 ```
 
-## Πώς δουλεύει
+Requires GHC (any recent version).
 
-Το project είναι χωρισμένο σε πολλά αρχεία που δουλεύουν μαζί:
+## License
 
-- **Main.hs**: Διαχειρίζεται τα I/O, παίρνει τα arguments και την αρχική tape από τον χρήστη
-- **Tokenizer.hs**: Κόβει το αρχείο σε tokens
-- **Parser.hs**: Χρησιμοποιεί τα tokens για να φτιάξει μια δομή δεδομένων με όλες τις πληροφορίες που χρειάζεται ο emulator (αλφάβητο, μηχανές, καταστάσεις, transitions). Αποθηκεύει όλα αυτά σε Maps (AVL trees με O(log n) αναζήτηση). Ο Parser κάνει και semantic analysis: ελέγχει completeness (αν είναι πλήρες), αν υπάρχουν όλες οι μηχανές που καλούνται, αν υπάρχει η start μηχανή, αν υπάρχουν duplicates, κ.λπ.
-- **Emulator.hs**: Τρέχει το πρόγραμμα χωρίς να χρειάζεται να κάνει πολλούς ελέγχους, γιατί ο Parser ήδη σιγουρέψε  ότι όλα είναι σωστά
-- **Types.hs**: Ορισμός των τύπων δεδομένων
-- **Map.hs**: Υλοποιεί AVL trees (ισορροπημένα δυαδικά δέντρα αναζήτησης) για να αποθηκεύονται αποδοτικά οι μηχανές, οι καταστάσεις και τα transitions. Περιέχει insert, lookup, rebalance, και βοηθητικές συναρτήσεις για να δουλεύει το Map σαν efficient dictionary.
-
-Επίσης, έχω προσθέσει τη δυνατότητα να βάζετε σχόλια της μορφής `-- comment` μέσα στα αρχεία προγραμμάτων. Ο tokenizer μου αγνοεί αυτά τα σχόλια μέχρι το newline, οπότε μπορείτε να γράφετε ό,τι θέλετε για επεξηγήσεις χωρίς να επηρεάζεται η εκτέλεση.
-
-## Τι έχω δοκιμάσει
-
-Ο Parser πιάνει λάθη και ο Emulator φαίνεται να δουλεύει σωστά. Έχω υλοποιήσει δύο προγράμματα:
-
-### 1. Reverse (programs/reverse.turing)
-Δίνεις μια σειρά από σύμβολα (a, b, c, ...) και σου τα επιστρέφει ανάποδα.
-
-### 2. Binary Addition (programs/addition.turing)
-Αυτό ήταν το βαρύ project. Κάνει binary πρόσθεση για αριθμούς της μορφής `1 0 1 plus 1 0 plus 1 plus ...`
-
-Δουλεύει για οποιαδήποτε είσοδο, ακόμα και για περίεργες!
-
-Δοκιμάστε:
-- `plus plus plus` (επιστρέφει 0)
-- `1 plus plus plus 1 plus` (επιστρέφει 10)
-- `0 plus 0 plus 0 plus 0` (επιστρέφει 0)
-- `1 0 1 plus 1 0 plus 1 plus` (επιστρέφει 1000)
-- `plus 1 plus 0 plus 1 plus plus` (επιστρέφει 10)
-
-Δοκιμάστε ό,τι συνδυασμό θέλετε, δεν θα σπάσει! (ελπίζω)
-
-Η στρατηγική που ακολούθησα είναι πολύ ενδιαφέρουσα, βασίζεται στην αναδρομή:
-
-Όταν δώσω είσοδο όπως `[_] 1 0 1 plus 1 0 plus 1`, το πρόγραμμα θα βρει το πρώτο `plus` και θα το αλλάξει σε `_`, οπότε θα έχουμε:
-`1 0 1 [_] 1 0 plus 1`
-Μετά θα καλέσει αναδρομικά τον εαυτό του για να υπολογίσει την πρόσθεση.
-
-Όταν υπολογιστεί, θα έχουμε:
-`_ 1 0 1 [_] 1 1`
-και θα βάλει πίσω το `plus`:
-`_ 1 0 1 [plus] 1 1`
-Στη συνέχεια, ο emulator επιστρέφει πίσω στην αρχή και καλεί το μηχάνημα `zip`, το οποίο ευθυγραμμίζει τα bits των δύο αριθμών σε ζευγάρια, προσθέτοντας μηδενικά όταν ένα έχει περισσότερα bits.
-
-Έτσι θα φτιαχτεί το `[_] 0 1 0 1 1 1`, και μετά τα κάνει reverse γιατί θέλει να βλέπει τα ζευγάρια από least significant πρώτα προς most significant (`[_] 1 1 1 0 1 0`). (Χρησιμοποίησα το ίδιο μηχάνημα που υλοποίησα στο πρόγραμμα reverse.)
-
-Στη συνέχεια χρησιμοποιεί το μηχάνημα `sum_bits` για να προσθέτει τα bits ένα-ένα. Το μηχάνημα αυτό παίρνει είσοδο:
-`[_] carry_in A B x x`
-και υπολογίζει:
-`[sum] carry_out x x`
-Οπότε κάπως έτσι φτιάχνω τον αριθμό, κάνοντας shift_right για να βάζω τα αποτελέσματα το ένα μετά το άλλο, και στο τέλος κάνω ένα τελευταίο reverse για να είναι τα least significant bits στα δεξιά.
-
-Νομίζω το zip είναι επίσης πολύ ενδιαφέρον μηχάνημα. Παίρνει input της μορφής `_ 1 0 1 plus 1 1` και κάνει ζευγάρια τα bits, χειρίζεται περιπτώσεις όπως `_ plus 1 1` ή `_ 1 1 plus _` και γενικά αριθμούς με διαφορετικό πλήθος bits, προσθέτοντας μηδενικά για να φτιάξει ζευγάρια.
-
-Αρχικά, πάει στο τέλος του αριθμού (`_ 1 0 1 plus 1 1 [_]`). Στη συνέχεια αρχίζει να διαβάζει προς τα αριστερά. Για κάθε αριθμό που βρίσκει, κάνει δύο φορές shift_right για να δημιουργήσει την τρύπα (`_ 1 0 1 plus 1 [_] _ 1`). Θα γίνει σύντομα προφανές γιατί δύο φορές: στη συνέχεια διατρέχει προς τα αριστερά μέχρι να βρει το πρώτο στοιχείο μετά το plus (`_ 1 0 [1] plus 1 _ _ 1`). Σε αυτή τη φάση, μπορεί να κάνει ένα απλό append, και αυτό θα βάλει το 1 στην τρύπα που είχαμε δημιουργήσει, εύκολα, χωρίς να χρειάζεται να πηγαίνω πίσω και να θυμάμαι τι είχα διαβάσει.
-
-`_ 1 0 [plus] 1 1 _ _ 1`, έπειτα μπορώ να πάω πίσω, να κλείσω την τρύπα που είχα φτιάξει και να επαναλάβω για τον επόμενο αριθμό (`_ 1 0 plus 1 1 [_] _ 1 <=> _ 1 0 plus [1] 1 1 <=> _ 1 [plus] 0 1 1 1`).
-
-Σε κάποια φάση φτάνω στο plus αλλά η αριστερή λίστα έχει ακόμα ψηφία. Εδώ κάνω αριστερό swap (`_ plus [1] 0 1 1 1`) και αν το στοιχείο που διαβάζω δεν είναι κενό, τότε προσθέτω ένα μηδενικό (`_ [plus] 0 1 0 1 1 1`) και επαναλαμβάνω. Αυτή τη φορά μετά το swap θα είναι κενό plus (`plus [_] 0 1 0 1 1 1`), οπότε μπορώ να κάνω ένα swap να φέρω το plus πίσω και να κάνω ένα shift_left για να διαγραφεί το plus και να πάω τον header μια αριστερά, οπότε θα έχω `[_] 0 1 0 1 1 1`.
-
-Έτσι χειρίζομαι την περίπτωση που η αριστερή λίστα έχει περισσότερα στοιχεία. Η περίπτωση που η δεξιά λίστα έχει περισσότερα στοιχεία προβλέπεται επίσης: π.χ. εδώ (`_ plus 1 [_] _ 1 0 0`) θα πάω αριστερά να βρω ζευγάρι για το ψηφίο 1 που είναι δεξιά από το κενό που έφτιαξα. Μετά το plus θα βρω κενό, σωστά; Όταν βρω το κενό, θα κάνω ένα shift_right και θα γράψω ένα μηδενικό (`_ [0] plus 1 _ 1 0`), οπότε τώρα μπορώ να κάνω append το μηδενικό και να συνεχίσω (`_ [plus] 1 0 _ 1 0`) επιστρεφοντας πισω για να κλείσω την τρίπα.
-
-Γι' αυτό χρειάζονται δύο κενά! Αν είχαμε μόνο ένα, το shift_right θα το έκλεινε και η append θα έσπρωχνε το 0 στο τέλος της λίστας, με αποτέλεσμα να βγει κάτι περίεργο. Με δύο κενά, το 0 μπαίνει σωστά στη θέση του και όλα δουλεύουν όπως πρέπει.
+MIT — see [LICENSE](./LICENSE).
